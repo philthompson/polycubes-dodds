@@ -23,7 +23,7 @@ use std::collections::HashSet;
 
 const N: usize = 6; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
 const FILTER_DEPTH: usize = 5;
-const THREADS: i32 = 2;	
+const THREADS: i32 = 2;
 
 const X: i32 = (N as i32 + 5) / 4 * ((N as i32 + 5) / 4 * 3 - 2); // set X<Y<Z such that aX+bY+cZ = 0 implies a = b = c = 0 or |a|+|b|+|c| > n
 const Y: i32 = X + 1; // trivial choice is X = 1, Y = n, Z = n * n. A simple reduction is X = 1, Y = n, Z = n * (n / 2) + (n + 1) / 2
@@ -188,36 +188,36 @@ fn main() {
 
 
 fn count_symmetric_polycubes(linear_map: &[i32; 9], affine_shift: [i32; 3]) -> usize {
-	let mut adj_counts = vec![vec![vec![0u8; (N + 2) as usize]; (2 * N + 1) as usize]; (2 * N + 1) as usize];
-	for z in 0..2 {
+	let mut adjacency_counts = vec![vec![vec![0u8; (N + 2) as usize]; (2 * N + 1) as usize]; (2 * N + 1) as usize];
+	'zloop: for z in 0..2 {
 		for y in 0..(2 * N + 1) {
 			for x in 0..(2 * N + 1) {
-				adj_counts[x as usize][y as usize][z as usize] = 1;
+				adjacency_counts[x as usize][y as usize][z as usize] = 1;
 				if z == 1 && y == N && x == N {
-					break;
+					break 'zloop;
 				}
 			}
 		}
 	}
 	let mut required_cells = HashSet::new();
-	let mut ext_stack: Vec<(i32, i32, i32)> = Vec::new();
-	ext_stack.push((N as i32, N as i32, 1));
+	let mut extension_stack: Vec<(i32, i32, i32)> = Vec::new();
+	extension_stack.push((N as i32, N as i32, 1));
 	let mut recovery_stack: Vec<(i32, i32, i32)> = Vec::new();
-	return count_extensions(N as i32, &mut adj_counts, &mut required_cells, &mut ext_stack, &mut recovery_stack, linear_map, affine_shift);
+	return count_extensions(N as i32, &mut adjacency_counts, &mut required_cells, &mut extension_stack, &mut recovery_stack, linear_map, affine_shift);
 }
 
 fn count_extensions(
 		mut cells_to_add: i32,
-		adj_counts: &mut Vec<Vec<Vec<u8>>>,
+		adjacency_counts: &mut Vec<Vec<Vec<u8>>>,
 		required_cells: &mut HashSet<(i32, i32, i32)>,
-		ext_stack: &mut Vec<(i32, i32, i32)>,
+		extension_stack: &mut Vec<(i32, i32, i32)>,
 		recovery_stack: &mut Vec<(i32, i32, i32)>,
 		linear_map: &[i32; 9],
 		affine_shift: [i32; 3]) -> usize {
 	cells_to_add -= 1;
 	let mut count = 0;
-	let original_length = ext_stack.len();
-	while let Some((x, y, z)) = ext_stack.pop() {
+	let original_length = extension_stack.len();
+	while let Some((x, y, z)) = extension_stack.pop() {
 		recovery_stack.push((x, y, z));
 
 		let existing_requirement = required_cells.remove(&(x, y, z));
@@ -250,7 +250,7 @@ fn count_extensions(
 			if cells_to_add == 0 {
 				count += 1;
 			} else {
-				let inner_original_length = ext_stack.len();
+				let inner_original_length = extension_stack.len();
 				/*
 				if (adjacencyCounts[x - 1, y, z]++ == 0) extensionStack.Push((x - 1, y, z));
 				if (adjacencyCounts[x, y - 1, z]++ == 0) extensionStack.Push((x, y - 1, z));
@@ -260,39 +260,60 @@ fn count_extensions(
 				if (adjacencyCounts[x, y, z + 1]++ == 0) extensionStack.Push((x, y, z + 1));
 				 */
 				// MS Copilot generated the following two lines:
-				//if mem::replace(&mut adj_counts[(x - 1) as usize][y as usize][z as usize], 0) == 0 { ext_stack.push_back((x - 1, y, z)); }
-				//if mem::replace(&mut adj_counts[x as usize][(y - 1) as usize][z as usize], 0) == 0 { ext_stack.push_back((x, y - 1, z)); }
-				//if adj_counts[(x - 1) as usize][y as usize][z as usize] == 0 { ext_stack.push_back((x - 1, y, z)); } adj_counts[(x - 1) as usize][y as usize][z as usize] += 1;
-				let adj_count: &mut u8 = &mut adj_counts[(x - 1) as usize][y as usize][z as usize];
-				if *adj_count == 0 { ext_stack.push((x - 1, y, z)); } *adj_count += 1;
-				let adj_count: &mut u8 = &mut adj_counts[x as usize][(y - 1) as usize][z as usize];
-				if *adj_count == 0 { ext_stack.push((x, y - 1, z)); } *adj_count += 1;
-				let adj_count: &mut u8 = &mut adj_counts[x as usize][y as usize][(z - 1) as usize];
-				if *adj_count == 0 { ext_stack.push((x, y, z - 1)); } *adj_count += 1;
-				let adj_count: &mut u8 = &mut adj_counts[(x + 1) as usize][y as usize][z as usize];
-				if *adj_count == 0 { ext_stack.push((x + 1, y, z)); } *adj_count += 1;
-				let adj_count: &mut u8 = &mut adj_counts[x as usize][(y + 1) as usize][z as usize];
-				if *adj_count == 0 { ext_stack.push((x, y + 1, z)); } *adj_count += 1;
-				let adj_count: &mut u8 = &mut adj_counts[x as usize][y as usize][(z + 1) as usize];
-				if *adj_count == 0 { ext_stack.push((x, y, z + 1)); } *adj_count += 1;
+				let adj_count: &mut u8 = &mut adjacency_counts[(x - 1) as usize][y as usize][z as usize];
+				if *adj_count == 0 {
+					//println!("A-pushing to ext stack: ({},{},{})", x - 1, y, z);
+					extension_stack.push((x - 1, y, z));
+				}
+				*adj_count += 1;
+				let adj_count: &mut u8 = &mut adjacency_counts[x as usize][(y - 1) as usize][z as usize];
+				if *adj_count == 0 {
+					//println!("B-pushing to ext stack: ({},{},{})", x, y - 1, z);
+					extension_stack.push((x, y - 1, z));
+				}
+				*adj_count += 1;
+				let adj_count: &mut u8 = &mut adjacency_counts[x as usize][y as usize][(z - 1) as usize];
+				if *adj_count == 0 {
+					//println!("C-pushing to ext stack: ({},{},{})", x, y, z - 1);
+					extension_stack.push((x, y, z - 1));
+				}
+				*adj_count += 1;
+				let adj_count: &mut u8 = &mut adjacency_counts[(x + 1) as usize][y as usize][z as usize];
+				if *adj_count == 0 {
+					//println!("D-pushing to ext stack: ({},{},{})", x + 1, y, z);
+					extension_stack.push((x + 1, y, z));
+				}
+				*adj_count += 1;
+				let adj_count: &mut u8 = &mut adjacency_counts[x as usize][(y + 1) as usize][z as usize];
+				if *adj_count == 0 {
+					//println!("E-pushing to ext stack: ({},{},{})", x, y + 1, z);
+					extension_stack.push((x, y + 1, z));
+				}
+				*adj_count += 1;
+				let adj_count: &mut u8 = &mut adjacency_counts[x as usize][y as usize][(z + 1) as usize];
+				if *adj_count == 0 {
+					//println!("F-pushing to ext stack: ({},{},{})", x, y, z + 1);
+					extension_stack.push((x, y, z + 1));
+				}
+				*adj_count += 1;
 
 				count += count_extensions(
 					cells_to_add,
-					adj_counts,
+					adjacency_counts,
 					required_cells,
-					ext_stack,
+					extension_stack,
 					recovery_stack,
 					linear_map,
 					affine_shift,
 				);
-				adj_counts[(x - 1) as usize][y as usize][z as usize] -= 1;
-				adj_counts[x as usize][(y - 1) as usize][z as usize] -= 1;
-				adj_counts[x as usize][y as usize][(z - 1) as usize] -= 1;
-				adj_counts[(x + 1) as usize][y as usize][z as usize] -= 1;
-				adj_counts[x as usize][(y + 1) as usize][z as usize] -= 1;
-				adj_counts[x as usize][y as usize][(z + 1) as usize] -= 1;
-				while ext_stack.len() != inner_original_length {
-					ext_stack.pop(); //should replace this with custom stack to avoid this unnecessary loop
+				adjacency_counts[(x - 1) as usize][y as usize][z as usize] -= 1;
+				adjacency_counts[x as usize][(y - 1) as usize][z as usize] -= 1;
+				adjacency_counts[x as usize][y as usize][(z - 1) as usize] -= 1;
+				adjacency_counts[(x + 1) as usize][y as usize][z as usize] -= 1;
+				adjacency_counts[x as usize][(y + 1) as usize][z as usize] -= 1;
+				adjacency_counts[x as usize][y as usize][(z + 1) as usize] -= 1;
+				while extension_stack.len() != inner_original_length {
+					extension_stack.pop(); //should replace this with custom stack to avoid this unnecessary loop
 				}
 			}
 		}
@@ -320,8 +341,8 @@ fn count_extensions(
 			}
 		}
 	}
-	while ext_stack.len() != original_length {
-		ext_stack.push(recovery_stack.pop().unwrap());
+	while extension_stack.len() != original_length {
+		extension_stack.push(recovery_stack.pop().unwrap());
 	}
 	return count;
 }
