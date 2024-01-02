@@ -199,6 +199,16 @@ fn count_symmetric_polycubes(linear_map: &[i32; 9], affine_shift: [i32; 3]) -> u
 			}
 		}
 	}
+	//for z in 0..2 {
+	//	print!("adj counts at z={z}:");
+	//	for y in 0..(2 * N + 1) {
+	//		println!("");
+	//		for x in 0..(2 * N + 1) {
+	//			print!("{}, ", adjacency_counts[x as usize][y as usize][z as usize]);
+	//		}
+	//	}
+	//	println!("");
+	//}
 	let mut required_cells = HashSet::new();
 	let mut extension_stack: Vec<(i32, i32, i32)> = Vec::new();
 	extension_stack.push((N as i32, N as i32, 1));
@@ -217,6 +227,8 @@ fn count_extensions(
 	cells_to_add -= 1;
 	let mut count = 0;
 	let original_length = extension_stack.len();
+	//while extension_stack.len() > 0 {
+	//	let (x, y, z) = extension_stack.pop().unwrap();
 	while let Some((x, y, z)) = extension_stack.pop() {
 		recovery_stack.push((x, y, z));
 
@@ -228,8 +240,24 @@ fn count_extensions(
 			let mut temp_x = x;
 			let mut temp_y = y;
 			let mut temp_z = z;
+			//let mut iter: usize = 0; // iter is just for debugging and can be removed later
 			loop // works for general transformations of finite order
 			{
+				//println!("iter:{iter}:");
+				//println!("    tempX:{temp_x}");
+				//println!("        tempX = {} * {} + {} * {} + {} * {} + {}", linear_map[0], temp_x, linear_map[1], temp_y, linear_map[2], temp_z, affine_shift[0]);
+				//temp_x = linear_map[0] * temp_x + linear_map[1] * temp_y + linear_map[2] * temp_z + affine_shift[0];
+				//println!("              = {temp_x}");
+				//println!("    tempY:{temp_y}");
+				//println!("        tempY = {} * {} + {} * {} + {} * {} + {}", linear_map[3], temp_x, linear_map[4], temp_y, linear_map[5], temp_z, affine_shift[1]);
+				//temp_y = linear_map[3] * temp_x + linear_map[4] * temp_y + linear_map[5] * temp_z + affine_shift[1];
+				//println!("              = {temp_y}");
+				//println!("    tempZ:{temp_z}");
+				//println!("        tempZ = {} * {} + {} * {} + {} * {} + {}", linear_map[6], temp_x, linear_map[7], temp_y, linear_map[8], temp_z, affine_shift[2]);
+				//temp_z = linear_map[6] * temp_x + linear_map[7] * temp_y + linear_map[8] * temp_z + affine_shift[2];
+				//println!("              = {temp_z}");
+
+				//println!("iter:{iter}, tempX:{temp_x}, tempY:{temp_y}, tempZ:{temp_z}");
 				let (tx, ty, tz) = (
 					linear_map[0] * temp_x + linear_map[1] * temp_y + linear_map[2] * temp_z + affine_shift[0],
 					linear_map[3] * temp_x + linear_map[4] * temp_y + linear_map[5] * temp_z + affine_shift[1],
@@ -238,10 +266,15 @@ fn count_extensions(
 				temp_x = tx;
 				temp_y = ty;
 				temp_z = tz;
+				//println!("    --> tempX:{temp_x}, tempY:{temp_y}, tempZ:{temp_z}");
 				if x == temp_x && y == temp_y && z == temp_z {
+					//println!("    breaking, since {x}=={temp_x} && {y}=={temp_y} && {z}=={temp_z}");
 					break;
 				}
+				//println!("    req cells, inserting ({temp_x}, {temp_y}, {temp_z}), goes from length {}", required_cells.len());
 				required_cells.insert((temp_x, temp_y, temp_z));
+				//println!("    to length {}", required_cells.len());
+				//iter += 1;
 			}
 		}
 
@@ -260,37 +293,60 @@ fn count_extensions(
 				if (adjacencyCounts[x, y, z + 1]++ == 0) extensionStack.Push((x, y, z + 1));
 				 */
 				// MS Copilot generated the following two lines:
+				//if mem::replace(&mut adjacency_counts[(x - 1) as usize][y as usize][z as usize], 0) == 0 { extension_stack.push_back((x - 1, y, z)); }
+				//if mem::replace(&mut adjacency_counts[x as usize][(y - 1) as usize][z as usize], 0) == 0 { extension_stack.push_back((x, y - 1, z)); }
+				//if adjacency_counts[(x - 1) as usize][y as usize][z as usize] == 0 { extension_stack.push_back((x - 1, y, z)); } adjacency_counts[(x - 1) as usize][y as usize][z as usize] += 1;
+
+				//let adj_count: &mut u8 = &mut adjacency_counts[(x - 1) as usize][y as usize][z as usize];
+				//if *adj_count == 0 { extension_stack.push((x - 1, y, z)); } *adj_count += 1;
+				//let adj_count: &mut u8 = &mut adjacency_counts[x as usize][(y - 1) as usize][z as usize];
+				//if *adj_count == 0 { extension_stack.push((x, y - 1, z)); } *adj_count += 1;
+				//let adj_count: &mut u8 = &mut adjacency_counts[x as usize][y as usize][(z - 1) as usize];
+				//if *adj_count == 0 { extension_stack.push((x, y, z - 1)); } *adj_count += 1;
+				//let adj_count: &mut u8 = &mut adjacency_counts[(x + 1) as usize][y as usize][z as usize];
+				//if *adj_count == 0 { extension_stack.push((x + 1, y, z)); } *adj_count += 1;
+				//let adj_count: &mut u8 = &mut adjacency_counts[x as usize][(y + 1) as usize][z as usize];
+				//if *adj_count == 0 { extension_stack.push((x, y + 1, z)); } *adj_count += 1;
+				//let adj_count: &mut u8 = &mut adjacency_counts[x as usize][y as usize][(z + 1) as usize];
+				//if *adj_count == 0 { extension_stack.push((x, y, z + 1)); } *adj_count += 1;
+
 				let adj_count: &mut u8 = &mut adjacency_counts[(x - 1) as usize][y as usize][z as usize];
+				//println!("adj_count at x={}, y={}, z={}, is {}", x-1, y, z, *adj_count);
 				if *adj_count == 0 {
 					//println!("A-pushing to ext stack: ({},{},{})", x - 1, y, z);
 					extension_stack.push((x - 1, y, z));
 				}
 				*adj_count += 1;
 				let adj_count: &mut u8 = &mut adjacency_counts[x as usize][(y - 1) as usize][z as usize];
+				//println!("adj_count at x={}, y={}, z={}, is {}", x, y-1, z, *adj_count);
 				if *adj_count == 0 {
 					//println!("B-pushing to ext stack: ({},{},{})", x, y - 1, z);
 					extension_stack.push((x, y - 1, z));
 				}
 				*adj_count += 1;
 				let adj_count: &mut u8 = &mut adjacency_counts[x as usize][y as usize][(z - 1) as usize];
+				//println!("adj_count at x={}, y={}, z={}, is {}", x, y, z-1, *adj_count);
 				if *adj_count == 0 {
 					//println!("C-pushing to ext stack: ({},{},{})", x, y, z - 1);
 					extension_stack.push((x, y, z - 1));
 				}
 				*adj_count += 1;
 				let adj_count: &mut u8 = &mut adjacency_counts[(x + 1) as usize][y as usize][z as usize];
+				//println!("adj_count at x={}, y={}, z={}, is {}", x+1, y, z, *adj_count);
 				if *adj_count == 0 {
 					//println!("D-pushing to ext stack: ({},{},{})", x + 1, y, z);
 					extension_stack.push((x + 1, y, z));
 				}
 				*adj_count += 1;
 				let adj_count: &mut u8 = &mut adjacency_counts[x as usize][(y + 1) as usize][z as usize];
+				//println!("adj_count at x={}, y={}, z={}, is {}", x, y+1, z, *adj_count);
 				if *adj_count == 0 {
 					//println!("E-pushing to ext stack: ({},{},{})", x, y + 1, z);
 					extension_stack.push((x, y + 1, z));
 				}
 				*adj_count += 1;
 				let adj_count: &mut u8 = &mut adjacency_counts[x as usize][y as usize][(z + 1) as usize];
+				//println!("adj_count at x={}, y={}, z={}, is {}", x, y, z+1, *adj_count);
 				if *adj_count == 0 {
 					//println!("F-pushing to ext stack: ({},{},{})", x, y, z + 1);
 					extension_stack.push((x, y, z + 1));
@@ -368,9 +424,20 @@ fn count_extensions_subset(filter: usize) -> usize {
 		//}
 		*ref_stack = byte_board;
 		let mut i = byte_board.offset((N as isize + 1) * Z as isize);
+		let mut j: isize;
+		i = i.sub(1);
 		while i != byte_board {
-			i = i.sub(1);
+			j = 1;
+			while i != byte_board.offset(j) {
+				j += 1;
+			}
+			println!("offset {j} from byte_board, we are setting *i to 255");
 			*i = 255;
+			i = i.sub(1);
+		}
+		for i  in 0..1 {
+			let val = *(ref_stack_arr[i]);
+			println!("**refStack[{i}] = {val}");
 		}
 
 		println!("started task {}", filter);
@@ -437,10 +504,12 @@ fn count_extensions_subset_inner(depth: usize, mut stack_top_1: *mut *mut u8, mu
 	unsafe {
 		let mut count: usize = 0;
 		let stack_top_original = stack_top_1;
-		let filter_stop = ref_stack.add(filter);
+		//let filter_stop = ref_stack.add(filter);
+		let filter_stop = filter as isize;
 		while stack_top_1 != ref_stack {
 			stack_top_1 = stack_top_1.sub(1);
 			let index = *stack_top_1;
+			println!("after decrementing stack top 1 (offset {} from ref stack), *index is {}", stack_top_1.offset_from(ref_stack), *index);
 			let mut stack_top_inner = stack_top_1;
 			/*
 			if (++*(index - X) == 0) *stackTopInner++ = index - X;
@@ -450,12 +519,91 @@ fn count_extensions_subset_inner(depth: usize, mut stack_top_1: *mut *mut u8, mu
 			if (++*(index + Y) == 0) *stackTopInner++ = index + Y;
 			if (++*(index + Z) == 0) *stackTopInner++ = index + Z;
 			*/
-			let incr = index.sub(X as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.sub(X as usize); stack_top_inner = stack_top_inner.add(1); }
-			let incr = index.sub(Y as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.sub(Y as usize); stack_top_inner = stack_top_inner.add(1); }
-			let incr = index.sub(Z as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.sub(Z as usize); stack_top_inner = stack_top_inner.add(1); }
-			let incr = index.add(X as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.add(X as usize); stack_top_inner = stack_top_inner.add(1); }
-			let incr = index.add(Y as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.add(Y as usize); stack_top_inner = stack_top_inner.add(1); }
-			let incr = index.add(Z as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.add(Z as usize); stack_top_inner = stack_top_inner.add(1); }
+
+			//// getting overflow below
+			//let incr = index.sub(X as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.sub(X as usize); stack_top_inner = stack_top_inner.add(1); }
+			//let incr = index.sub(Y as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.sub(Y as usize); stack_top_inner = stack_top_inner.add(1); }
+			//let incr = index.sub(Z as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.sub(Z as usize); stack_top_inner = stack_top_inner.add(1); }
+			//// getting "attempt to add with overlow" in the below line
+			//let incr = index.add(X as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.add(X as usize); stack_top_inner = stack_top_inner.add(1); }
+			//let incr = index.add(Y as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.add(Y as usize); stack_top_inner = stack_top_inner.add(1); }
+			//let incr = index.add(Z as usize); *incr += 1; if *incr == 0 { *stack_top_inner = index.add(Z as usize); stack_top_inner = stack_top_inner.add(1); }
+
+
+			let incr = index.sub(X as usize);
+			println!("depth={depth}, ++(index-X) is ++({}) at index-{}", *incr, X);
+			//*incr += 1;
+			*incr = (*incr).wrapping_add(1); // thanks to https://stackoverflow.com/a/70776258/259456
+			if *incr == 0 {
+				*stack_top_inner = index.sub(X as usize);
+				println!("    stack top inner now holds index-{}, which was incremented to {}", X, *incr);
+				stack_top_inner = stack_top_inner.add(1);
+			} else {
+				println!("    stack top inner now holds index-{}, which was incremented to {}", X, *incr);
+			}
+			println!("    depth={depth}, index-X->{}", *incr);
+			let incr = index.sub(Y as usize);
+			println!("depth={depth}, ++(index-Y) is ++({}) at index-{}", *incr, Y);
+			//*incr += 1;
+			*incr = (*incr).wrapping_add(1); // thanks to https://stackoverflow.com/a/70776258/259456
+			if *incr == 0 {
+				*stack_top_inner = index.sub(Y as usize);
+				println!("    stack top inner now holds index-{}, which was incremented to {}", Y, *incr);
+				stack_top_inner = stack_top_inner.add(1);
+			} else {
+				println!("    stack top inner now holds index-{}, which was incremented to {}", Y, *incr);
+			}
+			println!("    depth={depth}, index-Y->{}", *incr);
+			let incr = index.sub(Z as usize);
+			println!("depth={depth}, ++(index-Z) is ++({}) at index-{}", *incr, Z);
+			//*incr += 1;
+			*incr = (*incr).wrapping_add(1); // thanks to https://stackoverflow.com/a/70776258/259456
+			if *incr == 0 {
+				*stack_top_inner = index.sub(Z as usize);
+				println!("    stack top inner now holds index-{}, which was incremented to {}", Z, *incr);
+				stack_top_inner = stack_top_inner.add(1);
+			} else {
+				println!("    stack top inner now holds index-{}, which was incremented to {}", Z, *incr);
+			}
+			println!("    depth={depth}, index-Z->{}", *incr);
+			let incr = index.add(X as usize);
+			println!("depth={depth}, ++(index+X) is ++({}) at index+{}", *incr, X);
+			//*incr += 1;
+			*incr = (*incr).wrapping_add(1); // thanks to https://stackoverflow.com/a/70776258/259456
+			if *incr == 0 {
+				*stack_top_inner = index.add(X as usize);
+				println!("    stack top inner now holds index+{}, which was incremented to {}", X, *incr);
+				stack_top_inner = stack_top_inner.add(1);
+			} else {
+				println!("    stack top inner now holds index+{}, which was incremented to {}", X, *incr);
+			}
+			println!("    depth={depth}, index+X->{}", *incr);
+			let incr = index.add(Y as usize);
+			println!("depth={depth}, ++(index+Y) is ++({}) at index+{}", *incr, Y);
+			//*incr += 1;
+			*incr = (*incr).wrapping_add(1); // thanks to https://stackoverflow.com/a/70776258/259456
+			if *incr == 0 {
+				*stack_top_inner = index.add(Y as usize);
+				println!("    stack top inner now holds index+{}, which was incremented to {}", Y, *incr);
+				stack_top_inner = stack_top_inner.add(1);
+			} else {
+				println!("    stack top inner now holds index+{}, which was incremented to {}", Y, *incr);
+			}
+			println!("    depth={depth}, index+Y->{}", *incr);
+			let incr = index.add(Z as usize);
+			println!("depth={depth}, ++(index+Z) is ++({}) at index+{}", *incr, Z);
+			//*incr += 1;
+			*incr = (*incr).wrapping_add(1); // thanks to https://stackoverflow.com/a/70776258/259456
+			if *incr == 0 {
+				*stack_top_inner = index.add(Z as usize);
+				println!("    stack top inner now holds index+{}, which was incremented to {}", Z, *incr);
+				stack_top_inner = stack_top_inner.add(1);
+			} else {
+				println!("    stack top inner now holds index+{}, which was incremented to {}", Z, *incr);
+			}
+			println!("    depth={depth}, index+Z->{}", *incr);
+
+
 			// this is what MS Copilot generated:
 			//if (*index.sub(X as usize) += 1) == 0 {
 			//	*stack_top_inner = index.sub(X as usize);
@@ -482,17 +630,44 @@ fn count_extensions_subset_inner(depth: usize, mut stack_top_1: *mut *mut u8, mu
 			//	stack_top_inner = stack_top_inner.add(1);
 			//}
 			if depth == 4 {
+				let st1offset = stack_top_1.offset_from(ref_stack);
+				println!("doing recursion with depth={depth}, filterDepth={FILTER_DEPTH}, stackTop1-refStack={st1offset}, filter={filter_stop}");
 				count += count_extensions_subset_final(stack_top_inner, ref_stack);
-			} else if depth != FILTER_DEPTH || stack_top_1.sub(ref_stack as usize) == filter_stop {
+			} else if depth != FILTER_DEPTH || stack_top_1.offset_from(ref_stack) == filter_stop {
+				let st1offset = stack_top_1.offset_from(ref_stack);
+				println!("doing recursion with depth={depth}, filterDepth={FILTER_DEPTH}, stackTop1-refStack={st1offset}, filter={filter_stop}");
 				count += count_extensions_subset_inner(depth - 1, stack_top_inner, stack_top_2, ref_stack, filter); // if multithreading is not wanted, remove "if (condition)" from this else statement
+			} else {
+				let st1offset = stack_top_1.offset_from(ref_stack);
+				println!("NOT doing recursion with depth={depth}, filterDepth={FILTER_DEPTH}, stackTop1-refStack={st1offset}, filter={filter_stop}");
 			}
-			*index.sub(X as usize) -= 1;
-			*index.sub(Y as usize) -= 1;
-			*index.sub(Z as usize) -= 1;
-			*index.add(X as usize) -= 1;
-			*index.add(Y as usize) -= 1;
-			*index.add(Z as usize) -= 1;
-			*stack_top_2.sub(1) = index; // doing this push before the recursion would add one extra unnecessary element to the stack at each level of recursion
+			//*index.sub(X as usize) -= 1;
+			println!("decrementing at index - X (index-{X}), which holds {}", *index.sub(X as usize));
+			*index.sub(X as usize) = (*index.sub(X as usize)).wrapping_sub(1);
+			println!("    (index-{X}) now holds {}", *index.sub(X as usize));
+			//*index.sub(Y as usize) -= 1;
+			println!("decrementing at index - Y (index-{Y}), which holds {}", *index.sub(Y as usize));
+			*index.sub(Y as usize) = (*index.sub(Y as usize)).wrapping_sub(1);
+			println!("    (index-{Y}) now holds {}", *index.sub(Y as usize));
+			//*index.sub(Z as usize) -= 1;
+			println!("decrementing at index - Z (index-{Z}), which holds {}", *index.sub(Z as usize));
+			*index.sub(Z as usize) = (*index.sub(Z as usize)).wrapping_sub(1);
+			println!("    (index-{Z}) now holds {}", *index.sub(Z as usize));
+			//*index.add(X as usize) -= 1;
+			println!("decrementing at index + X (index+{X}), which holds {}", *index.add(X as usize));
+			*index.add(X as usize) = (*index.add(X as usize)).wrapping_sub(1);
+			println!("    (index+{X}) now holds {}", *index.add(X as usize));
+			//*index.add(Y as usize) -= 1;
+			println!("decrementing at index + Y (index+{Y}), which holds {}", *index.add(Y as usize));
+			*index.add(Y as usize) = (*index.add(Y as usize)).wrapping_sub(1);
+			println!("    (index+{Y}) now holds {}", *index.add(Y as usize));
+			//*index.add(Z as usize) -= 1;
+			println!("decrementing at index + Z (index+{Z}), which holds {}", *index.add(Z as usize));
+			*index.add(Z as usize) = (*index.add(Z as usize)).wrapping_sub(1);
+			println!("    (index+{Z}) now holds {}", *index.add(Z as usize));
+			stack_top_2 = stack_top_2.sub(1);
+			*stack_top_2 = index; // doing this push before the recursion would add one extra unnecessary element to the stack at each level of recursion
+			println!("does stack top 1 == ref stack ? {}", if stack_top_1 == ref_stack { "yes" } else { "no" });
 		}
 		while stack_top_1 != stack_top_original {
 			*stack_top_1 = *stack_top_2;
@@ -536,20 +711,124 @@ fn count_extensions_subset_final(mut stack_top: *mut *mut u8, ref_stack: *mut *m
 	*/
 	unsafe {
 		let length = stack_top.offset_from(ref_stack);
-		let mut count: usize = (length * (length - 1) * (length - 2) / 6).try_into().unwrap();
+		let mut count: isize = (length * (length - 1) * (length - 2) / 6).try_into().unwrap();
 		let mut stack_top_temp = stack_top;
 		while stack_top_temp != ref_stack {
 			stack_top_temp = stack_top_temp.sub(1);
 			let i = *stack_top_temp;
 			let mut neighbours = 0;
 			let mut subcount: usize = 128;
-			let incr = i.sub(X as usize); if *incr > 127 { neighbours += 1; subcount += *incr.sub(X2) as usize + *incr.sub(SZX) as usize + *incr.add(DYX) as usize + *incr.add(DZX) as usize; *incr.sub(X as usize) -= 1; count += *incr as usize; }
-			let incr = i.sub(Y as usize); if *incr > 127 { neighbours += 1; subcount += *incr.sub(Y2) as usize + *incr.sub(SZY) as usize + *incr.sub(DYX) as usize + *incr.add(DZY) as usize; *incr.sub(Y as usize) -= 1; count += *incr as usize; }
-			let incr = i.sub(Z as usize); if *incr > 127 { neighbours += 1; subcount += *incr.sub(Z2) as usize + *incr.sub(SZY) as usize + *incr.sub(DZX) as usize + *incr.sub(DZX) as usize; *incr.sub(Z as usize) -= 1; count += *incr as usize; }
-			let incr = i.add(X as usize); if *incr > 127 { neighbours += 1; subcount += *incr.add(X2) as usize + *incr.add(SZX) as usize + *incr.sub(DYX) as usize + *incr.sub(DYX) as usize; *incr.add(X as usize) -= 1; count += *incr as usize; }
-			let incr = i.add(Y as usize); if *incr > 127 { neighbours += 1; subcount += *incr.add(Y2) as usize + *incr.add(SZY) as usize + *incr.add(DYX) as usize + *incr.sub(DYX) as usize; *incr.add(Y as usize) -= 1; count += *incr as usize; }
-			let incr = i.add(Z as usize); if *incr > 127 { neighbours += 1; subcount += *incr.add(Z2) as usize + *incr.add(SZY) as usize + *incr.add(DZX) as usize + *incr.add(DZY) as usize; *incr.add(Z as usize) -= 1; count += *incr as usize; }
-			count += (subcount >> 8) + ((neighbours * (neighbours + ((length << 1) - 511)) >> 1) as usize);
+			// orig wrong:
+			//let incr = i.sub(X as usize); if *incr > 127 { neighbours += 1; subcount += *incr.sub(X2) as usize + *incr.sub(SZX) as usize + *incr.add(DYX) as usize + *incr.add(DZX) as usize; *incr.sub(X as usize) -= 1; count += *incr as usize; }
+			//let incr = i.sub(Y as usize); if *incr > 127 { neighbours += 1; subcount += *incr.sub(Y2) as usize + *incr.sub(SZY) as usize + *incr.sub(DYX) as usize + *incr.add(DZY) as usize; *incr.sub(Y as usize) -= 1; count += *incr as usize; }
+			//let incr = i.sub(Z as usize); if *incr > 127 { neighbours += 1; subcount += *incr.sub(Z2) as usize + *incr.sub(SZY) as usize + *incr.sub(DZX) as usize + *incr.sub(DZX) as usize; *incr.sub(Z as usize) -= 1; count += *incr as usize; }
+			//let incr = i.add(X as usize); if *incr > 127 { neighbours += 1; subcount += *incr.add(X2) as usize + *incr.add(SZX) as usize + *incr.sub(DYX) as usize + *incr.sub(DYX) as usize; *incr.add(X as usize) -= 1; count += *incr as usize; }
+			//let incr = i.add(Y as usize); if *incr > 127 { neighbours += 1; subcount += *incr.add(Y2) as usize + *incr.add(SZY) as usize + *incr.add(DYX) as usize + *incr.sub(DYX) as usize; *incr.add(Y as usize) -= 1; count += *incr as usize; }
+			//let incr = i.add(Z as usize); if *incr > 127 { neighbours += 1; subcount += *incr.add(Z2) as usize + *incr.add(SZY) as usize + *incr.add(DZX) as usize + *incr.add(DZY) as usize; *incr.add(Z as usize) -= 1; count += *incr as usize; }
+			// corrected:
+			//let incr = i.sub(X as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(X2) as usize + *i.sub(SYX) as usize + *i.sub(SZX) as usize + *i.add(DYX) as usize + *i.add(DZX) as usize; *incr -= 1; count += *incr as isize; }
+			//let incr = i.sub(Y as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(Y2) as usize + *i.sub(SYX) as usize + *i.sub(SZY) as usize + *i.sub(DYX) as usize + *i.add(DZY) as usize; *incr -= 1; count += *incr as isize; }
+			//let incr = i.sub(Z as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(Z2) as usize + *i.sub(SZX) as usize + *i.sub(SZY) as usize + *i.sub(DZX) as usize + *i.sub(DZY) as usize; *incr -= 1; count += *incr as isize; }
+			//let incr = i.add(X as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(X2) as usize + *i.add(SYX) as usize + *i.add(SZX) as usize + *i.sub(DYX) as usize + *i.sub(DZX) as usize; *incr -= 1; count += *incr as isize; }
+			//let incr = i.add(Y as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(Y2) as usize + *i.add(SYX) as usize + *i.add(SZY) as usize + *i.add(DYX) as usize + *i.sub(DZY) as usize; *incr -= 1; count += *incr as isize; }
+			//let incr = i.add(Z as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(Z2) as usize + *i.add(SZX) as usize + *i.add(SZY) as usize + *i.add(DZX) as usize + *i.add(DZY) as usize; *incr -= 1; count += *incr as isize; }
+			let incr = i.sub(X as usize);
+			if *incr > 127 {
+				neighbours += 1;
+				println!("neighbors incremented to {neighbours}");
+				print!("-X: subcount goes from {subcount} to ");
+				//subcount += *incr.sub(X2) as usize + *incr.sub(SZX) as usize + *incr.add(DYX) as usize + *incr.add(DZX) as usize;
+				subcount += *i.sub(X2) as usize + *i.sub(SYX) as usize + *i.sub(SZX) as usize + *i.add(DYX) as usize + *i.add(DZX) as usize;
+				//*incr.sub(X as usize) -= 1;
+				println!("{subcount}");
+				//println!("added {}, {}, {}, {}, {}", *incr.sub(X2), *incr.sub(SYX), *incr.sub(SZX), *incr.add(DYX), *incr.add(DZX));
+				println!("added {}, {}, {}, {}, {}", *i.sub(X2), *i.sub(SYX), *i.sub(SZX), *i.add(DYX), *i.add(DZX));
+				*incr -= 1;
+				count += *incr as isize;
+				println!("count is now {count}");
+			}
+			let incr = i.sub(Y as usize);
+			if *incr > 127 {
+				neighbours += 1;
+				println!("neighbors incremented to {neighbours}");
+				print!("-Y: subcount goes from {subcount} to ");
+				//subcount += *incr.sub(Y2) as usize + *incr.sub(SZY) as usize + *incr.sub(DYX) as usize + *incr.add(DZY) as usize;
+				subcount += *i.sub(Y2) as usize + *i.sub(SYX) as usize + *i.sub(SZY) as usize + *i.sub(DYX) as usize + *i.add(DZY) as usize;
+				//*incr.sub(Y as usize) -= 1;
+				println!("{subcount}");
+				*incr -= 1;
+				count += *incr as isize;
+				println!("count is now {count}");
+			}
+			let incr = i.sub(Z as usize);
+			if *incr > 127 {
+				neighbours += 1;
+				println!("neighbors incremented to {neighbours}");
+				print!("-Z: subcount goes from {subcount} to ");
+				//subcount += *incr.sub(Z2) as usize + *incr.sub(SZY) as usize + *incr.sub(DZX) as usize + *incr.sub(DZX) as usize;
+				subcount += *i.sub(Z2) as usize + *i.sub(SZX) as usize + *i.sub(SZY) as usize + *i.sub(DZX) as usize + *i.sub(DZY) as usize;
+				println!("{subcount}");
+				*incr -= 1;
+				count += *incr as isize;
+				println!("count is now {count}");
+			}
+			let incr = i.add(X as usize);
+			if *incr > 127 {
+				neighbours += 1;
+				println!("neighbors incremented to {neighbours}");
+				print!("+X: subcount goes from {subcount} to ");
+				//subcount += *incr.add(X2) as usize + *incr.add(SZX) as usize + *incr.sub(DYX) as usize + *incr.sub(DYX) as usize;
+				subcount += *i.add(X2) as usize + *i.add(SYX) as usize + *i.add(SZX) as usize + *i.sub(DYX) as usize + *i.sub(DZX) as usize;
+				println!("{subcount}");
+				println!("added {}, {}, {}, {}, {}", *i.add(X2), *i.add(SYX), *i.add(SZX), *i.sub(DYX), *i.sub(DZX));
+				*incr -= 1;
+				count += *incr as isize;
+				println!("count is now {count}");
+			}
+			let incr = i.add(Y as usize);
+			if *incr > 127 {
+				neighbours += 1;
+				println!("neighbors incremented to {neighbours}");
+				print!("+Y: subcount goes from {subcount} to ");
+				//subcount += *incr.add(Y2) as usize + *incr.add(SZY) as usize + *incr.add(DYX) as usize + *incr.sub(DYX) as usize;
+				subcount += *i.add(Y2) as usize + *i.add(SYX) as usize + *i.add(SZY) as usize + *i.add(DYX) as usize + *i.sub(DZY) as usize;
+				println!("{subcount}");
+				//println!("added {} + {} + {} + {}", *incr.add(Y2), *incr.add(SZY), *incr.add(DYX), *incr.sub(DYX));
+				*incr -= 1;
+				count += *incr as isize;
+				println!("count is now {count}");
+			}
+			let incr = i.add(Z as usize);
+			if *incr > 127 {
+				neighbours += 1;
+				println!("neighbors incremented to {neighbours}");
+				print!("+Z: subcount goes from {subcount} to ");
+				//subcount += *incr.add(Z2) as usize + *incr.add(SZY) as usize + *incr.add(DZX) as usize + *incr.add(DZY) as usize;
+				subcount += *i.add(Z2) as usize + *i.add(SZX) as usize + *i.add(SZY) as usize + *i.add(DZX) as usize + *i.add(DZY) as usize;
+				println!("{subcount}");
+				*incr -= 1;
+				count += *incr as isize;
+				println!("count is now {count}");
+			}
+			//count += (subcount >> 8) + ((neighbours * (neighbours + ((length << 1) - 511)) >> 1) as usize);
+			println!("subcount={subcount}");
+			let parta = (subcount >> 8) as isize;
+			println!("parta={parta}");
+			println!("length={length}");
+			let partb = length << 1;
+			println!("partb={partb}");
+			let partc = partb - 511;
+			println!("partc={partc}");
+			println!("neighbours={neighbours}");
+			let partd = neighbours + partc;
+			println!("partd={partd}");
+			let parte = neighbours * partd;
+			println!("parte={parte}");
+			let partf = (parte >> 1);
+			println!("partf={partf}");
+			let partg = parta + partf;
+			println!("partg={partg}");
+			count += partg;
 		}
 		while stack_top != ref_stack {
 			stack_top = stack_top.sub(1);
@@ -561,7 +840,7 @@ fn count_extensions_subset_final(mut stack_top: *mut *mut u8, ref_stack: *mut *m
 			let incr = i.add(Y as usize); *incr |= *incr >> 4;
 			let incr = i.add(Z as usize); *incr |= *incr >> 4;
 		}
-		return count;
+		return count as usize;
 	}
 
 }
