@@ -13,8 +13,29 @@ for initial testing, i found that the C# code produces the expected final count
 as of Jan. 2nd 2024, i've fixed up the ported rust code and it's now performing
    identically to the original C# code.
 
+------
+
+going to parallelize the initial symmetry counting portion
+
+before parallelizing running time:
+7859514470 free polycubes with 15 cells
+overall time: 00h:00m:34.250s
+
+after parallelizing running time:
+7859514470 free polycubes with 15 cells
+overall time: 00h:00m:11.723s
+
+the speed of this thing is insane!  on my M1 Mac mini,
+with 4 performance cores and 4 efficiency cores:
+457409613979 free polycubes with 17 cells
+overall time: 00h:05m:19.144s
+
+5 minutes to calculate n=17!  the other algorithm i
+  was optimizing would take 30+ days for n=17!
+
 */
 
+use std::io::Write;
 use std::time::Duration;
 use std::time::Instant;
 use std::thread;
@@ -38,6 +59,38 @@ const DYX: usize = (Y - X) as usize;
 const DZX: usize = (Z - X) as usize;
 const DZY: usize = (Z - Y) as usize;
 
+const DESCRIPTIONS: [&str; 4] = [
+	"orthogonal order 2 rotation",
+	"orthogonal order 4 rotation",
+	"short diagonal order 2 rotation",
+	"long diagonal order 3 rotation"
+];
+const AUT_CLASS_SIZES: [usize; 4] = [3, 6, 6, 8];
+const MATRIX_REPS: [[i32; 9]; 4] = [
+	[-1, 0, 0, 0, -1, 0, 0, 0, 1],
+	[0, -1, 0, 1, 0, 0, 0, 0, 1],
+	[0, 1, 0, 1, 0, 0, 0, 0, -1],
+	[0, 0, 1, 1, 0, 0, 0, 1, 0]
+];
+const AFFINE1: [[i32; 3]; 4] = [
+	[1, 0, 0],
+	[1, 0, 0],
+	[1, -1, 0],
+	[1, 0, -1]
+];
+const AFFINE2: [[i32; 3]; 4] = [
+	[0, 1, 0],
+	[0, 1, 0],
+	[0, 0, 1],
+	[0, 1, -1]
+];
+const BIASES: [[i32; 3]; 4] = [
+	[(2 * N) as i32, (2 * N) as i32, 0],
+	[(2 * N) as i32, 0, 0],
+	[0, 0, 2],
+	[(N - 1) as i32, 0, 1 - (N as i32)]
+];
+
 pub fn seconds_to_dur(s: f64) -> String {
 	let days = (s / 86400.0).floor();
 	let hours = ((s - (days * 86400.0)) / 3600.0).floor();
@@ -52,58 +105,95 @@ pub fn seconds_to_dur(s: f64) -> String {
 
 fn main() {
 	let overall_start_time = Instant::now();
+	let symmetry_time_elapsed: f64;
 	let mut count: usize = 0; // enumerate the sum over the order 24 group of the size of the fix of each group element, and divide by 24 (Burnside's lemma)
 	{
-		let sw: Instant = Instant::now();
-		let descriptions = [
-			"orthogonal order 2 rotation",
-			"orthogonal order 4 rotation",
-			"short diagonal order 2 rotation",
-			"long diagonal order 3 rotation"
-		];
-		let aut_class_sizes: [usize; 4] = [3, 6, 6, 8];
-		let matrix_reps = [
-			[-1, 0, 0, 0, -1, 0, 0, 0, 1],
-			[0, -1, 0, 1, 0, 0, 0, 0, 1],
-			[0, 1, 0, 1, 0, 0, 0, 0, -1],
-			[0, 0, 1, 1, 0, 0, 0, 1, 0]
-		];
-		let affine1 = [
-			[1, 0, 0],
-			[1, 0, 0],
-			[1, -1, 0],
-			[1, 0, -1]
-		];
-		let affine2 = [
-			[0, 1, 0],
-			[0, 1, 0],
-			[0, 0, 1],
-			[0, 1, -1]
-		];
-		let biases = [
-			[(2 * N) as i32, (2 * N) as i32, 0],
-			[(2 * N) as i32, 0, 0],
-			[0, 0, 2],
-			[(N - 1) as i32, 0, 1 - (N as i32)]
-		];
+		//let total_sym_count = (4 * ((2 * N) - 1)) as f64;
+		//let mut sym_count_done: f64 = 0.0;
+		//for sym in 0..4 {
+		//	let mut subcount = 0;
+		//	for i in (1 - (N as i32))..(N as i32) {
+		//		for j in (1 - (N as i32) + i.abs())..=((N as i32) - 1 - i.abs()) {
+		//			let handle = thread::spawn(move || count_symmetric_polycubes_task(i, j, sym));
+		//			total_worker_jobs += 1.0;
+		//			tasks.push(handle);
+		//			subcount += count_symmetric_polycubes(
+		//				&MATRIX_REPS[sym],
+		//				[
+		//					i * AFFINE1[sym][0] + j * AFFINE2[sym][0] + BIASES[sym][0],
+		//					i * AFFINE1[sym][1] + j * AFFINE2[sym][1] + BIASES[sym][1],
+		//					i * AFFINE1[sym][2] + j * AFFINE2[sym][2] + BIASES[sym][2]
+		//				]);
+		//		}
+		//	}
+		//	println!("\n{} polycubes fixed under each {}", subcount, DESCRIPTIONS[sym]);
+		//	println!("{} in total (symmetry occurs {} times)", AUT_CLASS_SIZES[sym] * subcount, AUT_CLASS_SIZES[sym]);
+		//	count += AUT_CLASS_SIZES[sym] * subcount;
+		//}
+
+		// run a batch of worker tasks for each of the 4 symmetries
 		for sym in 0..4 {
+			let sw: Instant = Instant::now();
 			let mut subcount = 0;
+
+			let mut tasks = Vec::new();
+			let mut total_worker_jobs: f64 = 0.0;
+
 			for i in (1 - (N as i32))..(N as i32) {
 				for j in (1 - (N as i32) + i.abs())..=((N as i32) - 1 - i.abs()) {
-					subcount += count_symmetric_polycubes(
-						&matrix_reps[sym],
-						[
-							i * affine1[sym][0] + j * affine2[sym][0] + biases[sym][0],
-							i * affine1[sym][1] + j * affine2[sym][1] + biases[sym][1],
-							i * affine1[sym][2] + j * affine2[sym][2] + biases[sym][2]
-						]);
+					let handle = thread::spawn(move || count_symmetric_polycubes_task(i, j, sym));
+					total_worker_jobs += 1.0;
+					tasks.push(handle);
 				}
 			}
-			println!("{} polycubes fixed under each {}", subcount, descriptions[sym]);
-			println!("{} in total (symmetry occurs {} times)", aut_class_sizes[sym] * subcount, aut_class_sizes[sym]);
-			count += aut_class_sizes[sym] * subcount;
+
+			let mut handle_index_to_join: Option<usize> = None;
+			let mut last_stats = Instant::now();
+			let mut compl_worker_jobs: f64 = 0.0;
+			while !tasks.is_empty() {
+				let mut j: usize = 0;
+				while j < tasks.len() {
+					if tasks[j].is_finished() {
+						handle_index_to_join = Some(j);
+						compl_worker_jobs += 1.0;
+						break;
+					} else {
+						thread::sleep(Duration::from_millis(50));
+					}
+					j += 1;
+				}
+				if last_stats.elapsed().as_secs_f32() > 1.0 {
+					last_stats = Instant::now();
+					let time_elapsed = sw.elapsed();
+					let seconds_per_sym = time_elapsed.as_secs_f64() / compl_worker_jobs;
+					let sym_remaining = total_worker_jobs - compl_worker_jobs;
+					let seconds_remaining = sym_remaining * seconds_per_sym;
+					let pct_complete = (compl_worker_jobs * 100.0) / total_worker_jobs;
+					let total_seconds = seconds_remaining + time_elapsed.as_secs_f64();
+					print!("    {:.4}% complete, ETA:[{}], total:[{}], counting for n={}, sym={}, outstanding sym:[{}-{}={}]        \r",
+						pct_complete,
+						seconds_to_dur(seconds_remaining),
+						seconds_to_dur(total_seconds),
+						N,
+						sym,
+						total_worker_jobs as usize,
+						compl_worker_jobs as usize,
+						(total_worker_jobs - compl_worker_jobs) as usize);
+					std::io::stdout().flush().unwrap();
+				}
+				if handle_index_to_join.is_none() {
+					continue;
+				}
+				subcount += tasks.remove(handle_index_to_join.unwrap()).join().unwrap();
+			}
+
+			println!("\n{} polycubes fixed under each {}", subcount, DESCRIPTIONS[sym]);
+			println!("{} in total (symmetry occurs {} times)", AUT_CLASS_SIZES[sym] * subcount, AUT_CLASS_SIZES[sym]);
+			count += AUT_CLASS_SIZES[sym] * subcount;
 		}
-		println!("total count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(sw.elapsed().as_secs_f64()));
+
+		symmetry_time_elapsed = overall_start_time.elapsed().as_secs_f64();
+		println!("total count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(symmetry_time_elapsed));
 	}
 
 	{
@@ -111,6 +201,7 @@ fn main() {
 		let mut subcount: usize = 0;
 		let mut tasks = Vec::new(); // please don't judge my multithreading - this was basically just my first attempt, to see if it helped
 		let mut jobs_remaining: isize = (4 * (N as i32 - FILTER_DEPTH as i32) - 2).try_into().unwrap(); // this is the maximum left stack length, which is the value being filtered to separate work
+		let total_worker_jobs = jobs_remaining as f64;
 		for _ in 0..THREADS {
 			let filter = jobs_remaining; // copy of i, since lambda expression captures the variable
 			jobs_remaining -= 1;
@@ -118,16 +209,38 @@ fn main() {
 			tasks.push(handle);
 		}
 		let mut handle_index_to_replace: Option<usize> = None;
+		let mut last_stats = Instant::now();
+		let mut compl_worker_jobs: f64 = 0.0;
 		// why should this continue once more when jobs_remaining == 0?
 		while jobs_remaining >= 0 {
-			let mut j = 0;
+			let mut j: usize = 0;
 			while j < tasks.len() {
 				if tasks[j].is_finished() {
 					handle_index_to_replace = Some(j);
+					compl_worker_jobs += 1.0;
 					break;
+				} else {
+					thread::sleep(Duration::from_millis(50));
 				}
-				thread::sleep(Duration::from_millis(50));
 				j += 1;
+			}
+			if last_stats.elapsed().as_secs_f32() > 1.0 {
+				last_stats = Instant::now();
+				let time_elapsed = sw.elapsed();
+				let seconds_per_thread = time_elapsed.as_secs_f64() / compl_worker_jobs;
+				let threads_remaining = jobs_remaining as f64;
+				let seconds_remaining = threads_remaining * seconds_per_thread;
+				let pct_complete = (compl_worker_jobs * 100.0) / total_worker_jobs;
+				let total_seconds = seconds_remaining + time_elapsed.as_secs_f64() + symmetry_time_elapsed;
+				print!("    {:.4}% complete, ETA:[{}], total:[{}], counting for n={}, outstanding threads:[{}-{}={}]        \r",
+					pct_complete,
+					seconds_to_dur(seconds_remaining),
+					seconds_to_dur(total_seconds),
+					N,
+					total_worker_jobs as usize,
+					compl_worker_jobs as usize,
+					(total_worker_jobs - compl_worker_jobs) as usize);
+				std::io::stdout().flush().unwrap();
 			}
 			if handle_index_to_replace.is_none() {
 				continue;
@@ -140,7 +253,7 @@ fn main() {
 		}
 		subcount += tasks.into_iter().map(|t| t.join().unwrap()).sum::<usize>(); // collect the results from all tasks
 		count += subcount;
-		println!("{:} polycubes with {} cells (number of polycubes fixed by trivial symmetry)\nTook {}", subcount, N, seconds_to_dur(sw.elapsed().as_secs_f64()));
+		println!("\n{:} polycubes with {} cells (number of polycubes fixed by trivial symmetry)\nTook {}", subcount, N, seconds_to_dur(sw.elapsed().as_secs_f64()));
 	}
 	println!();
 	count /= 24;
@@ -148,6 +261,15 @@ fn main() {
 	println!("overall time: {}", seconds_to_dur(overall_start_time.elapsed().as_secs_f64()));
 }
 
+fn count_symmetric_polycubes_task(i: i32, j: i32, sym: usize) -> usize {
+	return count_symmetric_polycubes(
+		&MATRIX_REPS[sym],
+		[
+			i * AFFINE1[sym][0] + j * AFFINE2[sym][0] + BIASES[sym][0],
+			i * AFFINE1[sym][1] + j * AFFINE2[sym][1] + BIASES[sym][1],
+			i * AFFINE1[sym][2] + j * AFFINE2[sym][2] + BIASES[sym][2]
+		]);
+}
 
 fn count_symmetric_polycubes(linear_map: &[i32; 9], affine_shift: [i32; 3]) -> usize {
 	let mut adjacency_counts = vec![vec![vec![0u8; (N + 2) as usize]; (2 * N + 1) as usize]; (2 * N + 1) as usize];
@@ -313,9 +435,9 @@ fn count_extensions_subset(filter: usize) -> usize {
 			i = i.sub(1);
 		}
 
-		println!("started task {}", filter);
+		//println!("started task {}", filter);
 		let count: usize = count_extensions_subset_inner(N as usize, ref_stack.add(1), ref_stack.add((N - 2) * 4 as usize), ref_stack, filter);
-		println!("finished task {} with subcount {}", filter, count);
+		//println!("finished task {} with subcount {}", filter, count);
 		return count;
 	}
 }
