@@ -41,9 +41,9 @@ use std::time::Instant;
 use std::thread;
 use std::collections::HashSet;
 
-const N: usize = 11; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
-const FILTER_DEPTH: usize = 5;
-const THREADS: i32 = 8;
+const N: usize = 16; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
+const FILTER_DEPTH: usize = 6;
+const THREADS: i32 = 3;
 
 const X: i32 = (N as i32 + 5) / 4 * ((N as i32 + 5) / 4 * 3 - 2); // set X<Y<Z such that aX+bY+cZ = 0 implies a = b = c = 0 or |a|+|b|+|c| > n
 const Y: i32 = X + 1; // trivial choice is X = 1, Y = n, Z = n * n. A simple reduction is X = 1, Y = n, Z = n * (n / 2) + (n + 1) / 2
@@ -133,24 +133,34 @@ fn main() {
 
 		// run a batch of worker tasks for each of the 4 symmetries
 		for sym in 0..4 {
+			println!("\nCounting {} symmetries (set {} of 4):", DESCRIPTIONS[sym], sym+1);
+			println!("note: percentage complete and ETA is just for this symmetry, not the entire overall count)");
 			let sw: Instant = Instant::now();
 			let mut subcount = 0;
 
+			let mut task_params: Vec<(i32, i32)> = Vec::new();
 			let mut tasks = Vec::new();
 			let mut total_worker_jobs: f64 = 0.0;
 
 			for i in (1 - (N as i32))..(N as i32) {
 				for j in (1 - (N as i32) + i.abs())..=((N as i32) - 1 - i.abs()) {
-					let handle = thread::spawn(move || count_symmetric_polycubes_task(i, j, sym));
+					task_params.push((i, j));
 					total_worker_jobs += 1.0;
-					tasks.push(handle);
 				}
+			}
+			for _ in 0..THREADS {
+				if task_params.is_empty() {
+					break
+				}
+				let (i, j) = task_params.pop().unwrap();
+				let handle = thread::spawn(move || count_symmetric_polycubes_task(i, j, sym));
+				tasks.push(handle);
 			}
 
 			let mut handle_index_to_join: Option<usize> = None;
 			let mut last_stats = Instant::now();
 			let mut compl_worker_jobs: f64 = 0.0;
-			while !tasks.is_empty() {
+			while !tasks.is_empty() || !task_params.is_empty() {
 				let mut j: usize = 0;
 				while j < tasks.len() {
 					if tasks[j].is_finished() {
@@ -169,11 +179,9 @@ fn main() {
 					let sym_remaining = total_worker_jobs - compl_worker_jobs;
 					let seconds_remaining = sym_remaining * seconds_per_sym;
 					let pct_complete = (compl_worker_jobs * 100.0) / total_worker_jobs;
-					let total_seconds = seconds_remaining + time_elapsed.as_secs_f64();
-					print!("    {:.4}% complete, ETA:[{}], total:[{}], counting for n={}, sym={}, outstanding sym:[{}-{}={}]        \r",
+					print!("    {:.4}% complete, ETA:[{}], counting for n={}, sym={}, outstanding sym:[{}-{}={}]        \r",
 						pct_complete,
 						seconds_to_dur(seconds_remaining),
-						seconds_to_dur(total_seconds),
 						N,
 						sym,
 						total_worker_jobs as usize,
@@ -184,7 +192,13 @@ fn main() {
 				if handle_index_to_join.is_none() {
 					continue;
 				}
-				subcount += tasks.remove(handle_index_to_join.unwrap()).join().unwrap();
+				// .take() the handle to join and remove it from the tasks list
+				subcount += tasks.remove(handle_index_to_join.take().unwrap()).join().unwrap();
+				// replace the completed thread with a new one
+				if let Some((i, j)) = task_params.pop() {
+					let handle = thread::spawn(move || count_symmetric_polycubes_task(i, j, sym));
+					tasks.push(handle);
+				}
 			}
 
 			println!("\n{} polycubes fixed under each {}", subcount, DESCRIPTIONS[sym]);
@@ -193,10 +207,11 @@ fn main() {
 		}
 
 		symmetry_time_elapsed = overall_start_time.elapsed().as_secs_f64();
-		println!("total count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(symmetry_time_elapsed));
+		println!("\ntotal count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(symmetry_time_elapsed));
 	}
 
 	{
+		println!("\nCounting polycubes via extensions...");
 		let sw = Instant::now();
 		let mut subcount: usize = 0;
 		let mut tasks = Vec::new(); // please don't judge my multithreading - this was basically just my first attempt, to see if it helped
@@ -245,7 +260,7 @@ fn main() {
 			if handle_index_to_replace.is_none() {
 				continue;
 			}
-			subcount += tasks.remove(handle_index_to_replace.unwrap()).join().unwrap();
+			subcount += tasks.remove(handle_index_to_replace.take().unwrap()).join().unwrap();
 			let filter = jobs_remaining; // copy of i, since lambda expression captures the variable
 			jobs_remaining -= 1;
 			let handle = thread::spawn(move || count_extensions_subset(filter as usize));
@@ -253,7 +268,7 @@ fn main() {
 		}
 		subcount += tasks.into_iter().map(|t| t.join().unwrap()).sum::<usize>(); // collect the results from all tasks
 		count += subcount;
-		println!("\n{:} polycubes with {} cells (number of polycubes fixed by trivial symmetry)\nTook {}", subcount, N, seconds_to_dur(sw.elapsed().as_secs_f64()));
+		println!("\n\n{:} polycubes with {} cells (number of polycubes fixed by trivial symmetry)\nTook {}", subcount, N, seconds_to_dur(sw.elapsed().as_secs_f64()));
 	}
 	println!();
 	count /= 24;
