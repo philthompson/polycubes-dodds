@@ -15,16 +15,6 @@ as of Jan. 2nd 2024, i've fixed up the ported rust code and it's now performing
 
 ------
 
-going to parallelize the initial symmetry counting portion
-
-before parallelizing running time:
-7859514470 free polycubes with 15 cells
-overall time: 00h:00m:34.250s
-
-after parallelizing running time:
-7859514470 free polycubes with 15 cells
-overall time: 00h:00m:11.723s
-
 the speed of this thing is insane!  on my M1 Mac mini,
 with 4 performance cores and 4 efficiency cores:
 457409613979 free polycubes with 17 cells
@@ -39,11 +29,12 @@ use std::io::Write;
 use std::time::Duration;
 use std::time::Instant;
 use std::thread;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
-const N: usize = 16; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
+const N: usize = 14; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
 const FILTER_DEPTH: usize = 6;
-const THREADS: i32 = 3;
+const THREADS: i32 = 7;
+const USE_PRECOMPUTED_SYMM: bool = false;
 
 const X: i32 = (N as i32 + 5) / 4 * ((N as i32 + 5) / 4 * 3 - 2); // set X<Y<Z such that aX+bY+cZ = 0 implies a = b = c = 0 or |a|+|b|+|c| > n
 const Y: i32 = X + 1; // trivial choice is X = 1, Y = n, Z = n * n. A simple reduction is X = 1, Y = n, Z = n * (n / 2) + (n + 1) / 2
@@ -91,6 +82,33 @@ const BIASES: [[i32; 3]; 4] = [
 	[(N - 1) as i32, 0, 1 - (N as i32)]
 ];
 
+// with the USE_PRECOMPUTED_SYMM constant:
+// lets us optionally use previously-calculated values here
+//   (for n=22, this portion took 2.5 hours on my M1 mac)
+const NONTRIVIAL_SYMMETRIES_COUNTS: [usize; 23] = [0,
+	/* n=1  */             0,
+	/* n=2  */             0,
+	/* n=3  */             0,
+	/* n=4  */             0,
+	/* n=5  */             0,
+	/* n=6  */             0,
+	/* n=7  */             0,
+	/* n=8  */             0,
+	/* n=9  */             0,
+	/* n=10 */             0,
+	/* n=11 */             0,
+	/* n=12 */             0,
+	/* n=13 */             0,
+	/* n=14 */     1_138_017,
+	/* n=15 */     2_446_834,
+	/* n=16 */             0,
+	/* n=17 */             0,
+	/* n=18 */             0,
+	/* n=19 */             0,
+	/* n=20 */             0,
+	/* n=21 */             0,
+	/* n=22 */ 3_699_765_374];
+
 pub fn seconds_to_dur(s: f64) -> String {
 	let days = (s / 86400.0).floor();
 	let hours = ((s - (days * 86400.0)) / 3600.0).floor();
@@ -107,34 +125,44 @@ fn main() {
 	let overall_start_time = Instant::now();
 	let symmetry_time_elapsed: f64;
 	let mut count: usize = 0; // enumerate the sum over the order 24 group of the size of the fix of each group element, and divide by 24 (Burnside's lemma)
-	{
-		//let total_sym_count = (4 * ((2 * N) - 1)) as f64;
-		//let mut sym_count_done: f64 = 0.0;
-		//for sym in 0..4 {
-		//	let mut subcount = 0;
-		//	for i in (1 - (N as i32))..(N as i32) {
-		//		for j in (1 - (N as i32) + i.abs())..=((N as i32) - 1 - i.abs()) {
-		//			let handle = thread::spawn(move || count_symmetric_polycubes_task(i, j, sym));
-		//			total_worker_jobs += 1.0;
-		//			tasks.push(handle);
-		//			subcount += count_symmetric_polycubes(
-		//				&MATRIX_REPS[sym],
-		//				[
-		//					i * AFFINE1[sym][0] + j * AFFINE2[sym][0] + BIASES[sym][0],
-		//					i * AFFINE1[sym][1] + j * AFFINE2[sym][1] + BIASES[sym][1],
-		//					i * AFFINE1[sym][2] + j * AFFINE2[sym][2] + BIASES[sym][2]
-		//				]);
-		//		}
-		//	}
-		//	println!("\n{} polycubes fixed under each {}", subcount, DESCRIPTIONS[sym]);
-		//	println!("{} in total (symmetry occurs {} times)", AUT_CLASS_SIZES[sym] * subcount, AUT_CLASS_SIZES[sym]);
-		//	count += AUT_CLASS_SIZES[sym] * subcount;
-		//}
 
+	if USE_PRECOMPUTED_SYMM && NONTRIVIAL_SYMMETRIES_COUNTS[N] > 0 {
+		count += NONTRIVIAL_SYMMETRIES_COUNTS[N];
+		symmetry_time_elapsed = overall_start_time.elapsed().as_secs_f64();
+		println!("used precomputed nontrivial symmetries count:");
+		println!("total count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(symmetry_time_elapsed));
+	} else if THREADS == 1 {
+		for sym in 0..4 {
+			let mut subcount = 0;
+			for i in (1 - (N as i32))..(N as i32) {
+				for j in (1 - (N as i32) + i.abs())..=((N as i32) - 1 - i.abs()) {
+					subcount += count_symmetric_polycubes(
+						&MATRIX_REPS[sym],
+						[
+							i * AFFINE1[sym][0] + j * AFFINE2[sym][0] + BIASES[sym][0],
+							i * AFFINE1[sym][1] + j * AFFINE2[sym][1] + BIASES[sym][1],
+							i * AFFINE1[sym][2] + j * AFFINE2[sym][2] + BIASES[sym][2]
+						]);
+				}
+			}
+			println!("\n{} polycubes fixed under each {}", subcount, DESCRIPTIONS[sym]);
+			println!("{} in total (symmetry occurs {} times)", AUT_CLASS_SIZES[sym] * subcount, AUT_CLASS_SIZES[sym]);
+			count += AUT_CLASS_SIZES[sym] * subcount;
+		}
+		symmetry_time_elapsed = overall_start_time.elapsed().as_secs_f64();
+		println!("total count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(symmetry_time_elapsed));
+	} else {
+		// for smaller values of N, we can greatly speed up computation by
+		//   lowering the sleep time used when waiting for threads to finish
+		// for larger values of N, we can check less often and waste fewer
+		//   cycles in the main thread
+		let n_sleep_millis: u64 = 2 + ((((N as f32).powf(3.7))/1200.0) as u64);
+		let n_sleep = Duration::from_millis(n_sleep_millis);
+		println!("N={N}, n_sleep_millis={n_sleep_millis}");
 		// run a batch of worker tasks for each of the 4 symmetries
 		for sym in 0..4 {
 			println!("\nCounting {} symmetries (set {} of 4):", DESCRIPTIONS[sym], sym+1);
-			println!("note: percentage complete and ETA is just for this symmetry, not the entire overall count)");
+			println!("(note: percentage complete and ETA is just for this symmetry, not the entire overall count)");
 			let sw: Instant = Instant::now();
 			let mut subcount = 0;
 
@@ -167,12 +195,10 @@ fn main() {
 						handle_index_to_join = Some(j);
 						compl_worker_jobs += 1.0;
 						break;
-					} else {
-						thread::sleep(Duration::from_millis(50));
 					}
 					j += 1;
 				}
-				if last_stats.elapsed().as_secs_f32() > 1.0 {
+				if last_stats.elapsed().as_secs_f32() > 1.0 && compl_worker_jobs > 0.0 {
 					last_stats = Instant::now();
 					let time_elapsed = sw.elapsed();
 					let seconds_per_sym = time_elapsed.as_secs_f64() / compl_worker_jobs;
@@ -190,6 +216,7 @@ fn main() {
 					std::io::stdout().flush().unwrap();
 				}
 				if handle_index_to_join.is_none() {
+					thread::sleep(n_sleep);
 					continue;
 				}
 				// .take() the handle to join and remove it from the tasks list
@@ -212,6 +239,9 @@ fn main() {
 
 	{
 		println!("\nCounting polycubes via extensions...");
+		let n_sleep_millis: u64 = 2 + ((((N as f32).powf(3.7))/1200.0) as u64);
+		let n_sleep = Duration::from_millis(n_sleep_millis);
+		println!("N={N}, n_sleep_millis={n_sleep_millis}");
 		let sw = Instant::now();
 		let mut subcount: usize = 0;
 		let mut tasks = Vec::new(); // please don't judge my multithreading - this was basically just my first attempt, to see if it helped
@@ -222,11 +252,12 @@ fn main() {
 			jobs_remaining -= 1;
 			let handle = thread::spawn(move || count_extensions_subset(filter as usize));
 			tasks.push(handle);
+			//println!("started worker thread {}", i+1);
 		}
 		let mut handle_index_to_replace: Option<usize> = None;
 		let mut last_stats = Instant::now();
 		let mut compl_worker_jobs: f64 = 0.0;
-		// why should this continue once more when jobs_remaining == 0?
+		// this needs to continue once more when jobs_remaining == 0
 		while jobs_remaining >= 0 {
 			let mut j: usize = 0;
 			while j < tasks.len() {
@@ -234,12 +265,10 @@ fn main() {
 					handle_index_to_replace = Some(j);
 					compl_worker_jobs += 1.0;
 					break;
-				} else {
-					thread::sleep(Duration::from_millis(50));
 				}
 				j += 1;
 			}
-			if last_stats.elapsed().as_secs_f32() > 1.0 {
+			if last_stats.elapsed().as_secs_f32() > 1.0 && compl_worker_jobs > 0.0 {
 				last_stats = Instant::now();
 				let time_elapsed = sw.elapsed();
 				let seconds_per_thread = time_elapsed.as_secs_f64() / compl_worker_jobs;
@@ -258,6 +287,7 @@ fn main() {
 				std::io::stdout().flush().unwrap();
 			}
 			if handle_index_to_replace.is_none() {
+				thread::sleep(n_sleep);
 				continue;
 			}
 			subcount += tasks.remove(handle_index_to_replace.take().unwrap()).join().unwrap();
@@ -298,7 +328,7 @@ fn count_symmetric_polycubes(linear_map: &[i32; 9], affine_shift: [i32; 3]) -> u
 			}
 		}
 	}
-	let mut required_cells = HashSet::new();
+	let mut required_cells = BTreeSet::new();
 	let mut extension_stack: Vec<(i32, i32, i32)> = Vec::new();
 	extension_stack.push((N as i32, N as i32, 1));
 	let mut recovery_stack: Vec<(i32, i32, i32)> = Vec::new();
@@ -308,7 +338,7 @@ fn count_symmetric_polycubes(linear_map: &[i32; 9], affine_shift: [i32; 3]) -> u
 fn count_extensions(
 		mut cells_to_add: i32,
 		adjacency_counts: &mut Vec<Vec<Vec<u8>>>,
-		required_cells: &mut HashSet<(i32, i32, i32)>,
+		required_cells: &mut BTreeSet<(i32, i32, i32)>,
 		extension_stack: &mut Vec<(i32, i32, i32)>,
 		recovery_stack: &mut Vec<(i32, i32, i32)>,
 		linear_map: &[i32; 9],
