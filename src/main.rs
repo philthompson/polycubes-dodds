@@ -44,19 +44,21 @@ for n=22, by FILTER_DEPTH:
 6 -> 62 worker tasks
 7 -> 58 worker tasks
 
-
 */
 
 use std::io::Write;
 use std::time::Duration;
 use std::time::Instant;
 use std::thread;
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+// this import needed on amazon linux
+//use std::convert::TryInto;
 
-const N: usize = 14; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
-const FILTER_DEPTH: usize = 6;
-const THREADS: i32 = 7;
-const USE_PRECOMPUTED_SYMM: bool = false;
+const N: usize = 15; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
+const FILTER_DEPTH: usize = 5;
+const THREADS: i32 = 8;
+const USE_PRECOMPUTED_SYMM: bool = true; // use precomputed nontrivial symmetries, if available
 
 const X: i32 = (N as i32 + 5) / 4 * ((N as i32 + 5) / 4 * 3 - 2); // set X<Y<Z such that aX+bY+cZ = 0 implies a = b = c = 0 or |a|+|b|+|c| > n
 const Y: i32 = X + 1; // trivial choice is X = 1, Y = n, Z = n * n. A simple reduction is X = 1, Y = n, Z = n * (n / 2) + (n + 1) / 2
@@ -131,7 +133,62 @@ const NONTRIVIAL_SYMMETRIES_COUNTS: [usize; 23] = [0,
 	/* n=21 */ 1_055_564_170,
 	/* n=22 */ 3_699_765_374];
 
-pub fn seconds_to_dur(s: f64) -> String {
+// from https://oeis.org/A000162
+// these are the number of unique polycubes of size n,
+//   which is kind of funny to put in a program that
+//   calculates these values -- but these could be used to
+//   help calculate estimated time remaining
+// n=1                        1
+// n=2                        1
+// n=3                        2
+// n=4                        8
+// n=5                       29
+// n=6                      166
+// n=7                    1_023
+// n=8                    6_922
+// n=9                   48_311
+// n=10                 346_543
+// n=11               2_522_522
+// n=12              18_598_427
+// n=13             138_462_649
+// n=14           1_039_496_297
+// n=15           7_859_514_470
+// n=16          59_795_121_480
+// n=17         457_409_613_979
+// n=18       3_516_009_200_564
+// n=19      27_144_143_923_583
+// n=20     210_375_361_379_518
+// n=21   1_636_128_187_400_680  /* estimate */
+// n=22  12_763_055_320_276_300  /* estimate */
+
+// for long-running counts, we can record previously-computed worker
+//   task counts here
+// this allows us to resume cancelled runs while keeping everything
+//   contained in this single file
+const TRIVIAL_SYMMETRIES_COUNTS_BY_N_FILTER_DEPTH_FILTER: [(usize, usize, usize, usize); 18] = [
+	//N, FILTER_DEPTH, filter, count
+	(15, 5, 7, 10309337032),
+	(15, 5, 8, 11262164848),
+	(15, 5, 9, 12390196930),
+	(15, 5, 10, 12870871661),
+	// N=17
+	(17, 5, 22, 223300442187),
+	(17, 5, 21, 275122791064),
+	(17, 5, 20, 330993580186),
+	(17, 5, 19, 391147998151),
+	(17, 5, 18, 452126433401),
+	(17, 5, 17, 511440046465),
+	(17, 5, 16, 567012434999),
+	(17, 5, 15, 618080954784),
+	(17, 5, 14, 655564999981),
+	(17, 5, 9, 646961888347),
+	(17, 5, 8, 583673049457),
+	(17, 5, 7, 529479491501),
+	(17, 5, 6, 461683597993),
+	(17, 5, 4, 289836494778),
+];
+
+fn seconds_to_dur(s: f64) -> String {
 	let days = (s / 86400.0).floor();
 	let hours = ((s - (days * 86400.0)) / 3600.0).floor();
 	let minutes = ((s - (days * 86400.0) - (hours * 3600.0)) / 60.0).floor();
@@ -141,6 +198,18 @@ pub fn seconds_to_dur(s: f64) -> String {
 		return format!("{} days {:0>2}h:{:0>2}m:{}s", days, hours, minutes, fsec);
 	}
 	return format!("{:0>2}h:{:0>2}m:{}s", hours, minutes, fsec);
+}
+
+// thanks to https://stackoverflow.com/a/67834588/259456
+fn integer_with_thousands_separator(num: usize) -> String {
+	return num.to_string()
+    .as_bytes()
+    .rchunks(3)
+    .rev()
+    .map(std::str::from_utf8)
+    .collect::<Result<Vec<&str>, _>>()
+    .unwrap()
+    .join(",");  // separator
 }
 
 fn main() {
@@ -178,7 +247,7 @@ fn main() {
 		//   lowering the sleep time used when waiting for threads to finish
 		// for larger values of N, we can check less often and waste fewer
 		//   cycles in the main thread
-		let n_sleep_millis: u64 = 2 + ((((N as f32).powf(3.7))/1200.0) as u64);
+		let n_sleep_millis: u64 = if N > 17 { N as u64 * 25 } else if N > 12 { N as u64 * 2 } else { N as u64 + 5 };
 		let n_sleep = Duration::from_millis(n_sleep_millis);
 		println!("N={N}, n_sleep_millis={n_sleep_millis}");
 		// run a batch of worker tasks for each of the 4 symmetries
@@ -268,50 +337,44 @@ fn main() {
 		let mut subcount: usize = 0;
 		let mut tasks = Vec::new(); // please don't judge my multithreading - this was basically just my first attempt, to see if it helped
 		let mut jobs_remaining: isize = (4 * (N as i32 - FILTER_DEPTH as i32) - 2).try_into().unwrap(); // this is the maximum left stack length, which is the value being filtered to separate work
-		let total_worker_jobs = jobs_remaining as f64;
+		// see if any previously-recorded jobs' counts are available
+		let mut recorded_counts: BTreeMap<usize, usize> = BTreeMap::new();
+		for recorded_count in TRIVIAL_SYMMETRIES_COUNTS_BY_N_FILTER_DEPTH_FILTER {
+			// for each tuple (N, FILTER_DEPTH, filter) keep the previously-computed count
+			if recorded_count.0 == N && recorded_count.1 == FILTER_DEPTH {
+				recorded_counts.insert(recorded_count.2, recorded_count.3);
+			}
+		}
 		for _ in 0..THREADS {
 			let filter = jobs_remaining; // copy of i, since lambda expression captures the variable
 			jobs_remaining -= 1;
-			let handle = thread::spawn(move || count_extensions_subset(filter as usize));
-			tasks.push(handle);
+			match recorded_counts.get(&(filter as usize)) {
+				Some(prev_count) => {
+					println!("using previously-recorded count [{prev_count}] for (N={N}, FILTER_DEPTH={FILTER_DEPTH}, filter={filter})");
+					subcount += prev_count;
+				},
+				None => {
+					//println!("no prev computed count for filter={filter}");
+					let handle = thread::spawn(move || count_extensions_subset(filter as usize));
+					tasks.push(handle);
+				}
+			}
 			// if we have more threads than jobs, stop here (jobs_remaining needs to
 			//   get to -1 before we stop)
 			if jobs_remaining < 0 {
 				break;
 			}
-			//println!("started worker thread {}", i+1);
 		}
 		let mut handle_index_to_replace: Option<usize> = None;
-		let mut last_stats = Instant::now();
-		let mut compl_worker_jobs: f64 = 0.0;
 		// this needs to continue once more when jobs_remaining == 0
 		while jobs_remaining >= 0 || !tasks.is_empty() {
 			let mut j: usize = 0;
 			while j < tasks.len() {
 				if tasks[j].is_finished() {
 					handle_index_to_replace = Some(j);
-					compl_worker_jobs += 1.0;
 					break;
 				}
 				j += 1;
-			}
-			if last_stats.elapsed().as_secs_f32() > 1.0 && compl_worker_jobs > 0.0 {
-				last_stats = Instant::now();
-				let time_elapsed = sw.elapsed();
-				let seconds_per_thread = time_elapsed.as_secs_f64() / compl_worker_jobs;
-				let threads_remaining = (jobs_remaining + tasks.len() as isize) as f64;
-				let seconds_remaining = threads_remaining * seconds_per_thread;
-				let pct_complete = (compl_worker_jobs * 100.0) / total_worker_jobs;
-				let total_seconds = seconds_remaining + time_elapsed.as_secs_f64() + symmetry_time_elapsed;
-				print!("    {:.4}% complete, ETA:[{}], total:[{}], counting for n={}, outstanding threads:[{}-{}={}]        \r",
-					pct_complete,
-					seconds_to_dur(seconds_remaining),
-					seconds_to_dur(total_seconds),
-					N,
-					total_worker_jobs as usize,
-					compl_worker_jobs as usize,
-					(total_worker_jobs - compl_worker_jobs) as usize);
-				std::io::stdout().flush().unwrap();
 			}
 			if handle_index_to_replace.is_none() {
 				thread::sleep(n_sleep);
@@ -319,11 +382,23 @@ fn main() {
 			}
 			subcount += tasks.remove(handle_index_to_replace.take().unwrap()).join().unwrap();
 			// this needs to continue once more when jobs_remaining == 0
-			if jobs_remaining >= 0 {
+			//let mut job_assigned = false;
+			while jobs_remaining >= 0 {//&& !job_assigned {
 				let filter = jobs_remaining; // copy of i, since lambda expression captures the variable
 				jobs_remaining -= 1;
-				let handle = thread::spawn(move || count_extensions_subset(filter as usize));
-				tasks.push(handle);
+
+				match recorded_counts.get(&(filter as usize)) {
+					Some(prev_count) => {
+						println!("using previously-recorded count [{prev_count}] for (N={N}, FILTER_DEPTH={FILTER_DEPTH}, filter={filter})");
+						subcount += prev_count;
+					},
+					None => {
+						//println!("no prev computed count for filter={filter}");
+						let handle = thread::spawn(move || count_extensions_subset(filter as usize));
+						tasks.push(handle);
+						break; // stop looping once we spawn a thread to replace the completed one
+					}
+				}
 			}
 		}
 		count += subcount;
@@ -331,7 +406,7 @@ fn main() {
 	}
 	println!();
 	count /= 24;
-	println!("{:} free polycubes with {} cells", count, N);
+	println!("{} free polycubes with {} cells", integer_with_thousands_separator(count), N);
 	println!("overall time: {}", seconds_to_dur(overall_start_time.elapsed().as_secs_f64()));
 }
 
@@ -495,6 +570,7 @@ fn count_extensions(
 fn count_extensions_subset(filter: usize) -> usize {
 
 	unsafe {
+		let start_time = Instant::now();
 		let mut byte_board_arr: [u8; (N as usize+ 2) * Z as usize] = [0; (N as usize + 2) * Z as usize];
 		let mut byte_board = byte_board_arr.as_mut_ptr();
 		let mut ref_stack_arr: [*mut u8; (N - 2) * 4] = [std::ptr::null_mut(); (N - 2) * 4];
@@ -509,9 +585,11 @@ fn count_extensions_subset(filter: usize) -> usize {
 			i = i.sub(1);
 		}
 
-		//println!("started task {}", filter);
+		println!("started  count_extensions_subset with filter={filter}, N={N}, FILTER_DEPTH={FILTER_DEPTH}");
 		let count: usize = count_extensions_subset_inner(N as usize, ref_stack.add(1), ref_stack.add((N - 2) * 4 as usize), ref_stack, filter);
-		//println!("finished task {} with subcount {}", filter, count);
+
+		let time_elapsed = start_time.elapsed().as_secs_f64();
+		println!("finished count_extensions_subset with filter={filter}, N={N}, FILTER_DEPTH={FILTER_DEPTH}, took {} with count={count}", seconds_to_dur(time_elapsed));
 		return count;
 	}
 }
