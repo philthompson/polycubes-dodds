@@ -155,6 +155,12 @@ const TRIVIAL_SYMMETRIES_COUNTS_BY_N_FILTER_DEPTH_FILTER: [(usize, usize, usize,
 	(17, 5, 4, 289836494778),
 ];
 
+// for smaller values of N, we can greatly speed up computation by
+//   lowering the sleep time used when waiting for threads to finish
+// for larger values of N, we can check less often and waste fewer
+//   cycles in the main thread
+const N_SLEEP_MILLIS: u64 = if N > 19 { N as u64 * 100 } else if N > 17 { N as u64 * 25 } else if N > 12 { N as u64 * 2 } else { N as u64 + 5 };
+
 fn seconds_to_dur(s: f64) -> String {
 	let days = (s / 86400.0).floor();
 	let hours = ((s - (days * 86400.0)) / 3600.0).floor();
@@ -214,13 +220,8 @@ fn main() {
 		symmetry_time_elapsed = overall_start_time.elapsed().as_secs_f64();
 		println!("total count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(symmetry_time_elapsed));
 	} else {
-		// for smaller values of N, we can greatly speed up computation by
-		//   lowering the sleep time used when waiting for threads to finish
-		// for larger values of N, we can check less often and waste fewer
-		//   cycles in the main thread
-		let n_sleep_millis: u64 = if N > 17 { N as u64 * 25 } else if N > 12 { N as u64 * 2 } else { N as u64 + 5 };
-		let n_sleep = Duration::from_millis(n_sleep_millis);
-		println!("N={N}, n_sleep_millis={n_sleep_millis}");
+		let n_sleep = Duration::from_millis(N_SLEEP_MILLIS);
+		println!("N={N}, n_sleep_millis={N_SLEEP_MILLIS}");
 		// run a batch of worker tasks for each of the 4 symmetries
 		for sym in 0..4 {
 			print_w_time(overall_start_time, format!("Counting {} symmetries (set {} of 4):", DESCRIPTIONS[sym], sym+1));
@@ -303,9 +304,8 @@ fn main() {
 
 	{
 		print_w_time(overall_start_time, format!("\nCounting polycubes via extensions..."));
-		let n_sleep_millis: u64 = 2 + ((((N as f32).powf(3.7))/1200.0) as u64);
-		let n_sleep = Duration::from_millis(n_sleep_millis);
-		println!("N={N}, n_sleep_millis={n_sleep_millis}");
+		let n_sleep = Duration::from_millis(N_SLEEP_MILLIS);
+		println!("N={N}, n_sleep_millis={N_SLEEP_MILLIS}");
 		let sw = Instant::now();
 		let mut subcount: usize = 0;
 		let mut tasks = Vec::new(); // please don't judge my multithreading - this was basically just my first attempt, to see if it helped
