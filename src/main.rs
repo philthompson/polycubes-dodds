@@ -13,6 +13,10 @@ rust port cleanup and debugging by Phil Thompson in January 2024, along with cha
 as it stands now, the maximum number of threads needed (or AWS EC2 vCPUs) is 64,
   even for n=22, because the slowest jobs run in ~5x the time as the fastest
 
+by starting tasks in reverse order (starting at filter=0, using RUN_JOBS_REVERSED=true)
+   it seems like it's possible that running with half the threads (32) will complete
+   in the same overall runtime as starting with the highest filter number with 64 threads
+
 for n=17, by FILTER_DEPTH:
 5 -> 46 worker tasks
 6 -> 42 worker tasks
@@ -48,11 +52,14 @@ use std::collections::BTreeSet;
 // this import needed on amazon linux
 //use std::convert::TryInto;
 
-const N: usize = 15; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
+const N: usize = 14; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
 const FILTER_DEPTH: usize = 5;
-const THREADS: i32 = 8;
+const THREADS: i32 = 2;
 const USE_PRECOMPUTED_SYMM: bool = true; // use precomputed nontrivial symmetries, if available
 const SHOW_NONTRIVIAL_SYMM_ETA: bool = true;
+// set this to true, to reduce overall run time, if the number of threads is at least half the total number of "trivial symmetry" worker tasks
+// set this to false to run the fastest "trivial symmetry" worker tasks first
+const RUN_JOBS_REVERSED: bool = true;
 
 const X: i32 = (N as i32 + 5) / 4 * ((N as i32 + 5) / 4 * 3 - 2); // set X<Y<Z such that aX+bY+cZ = 0 implies a = b = c = 0 or |a|+|b|+|c| > n
 const Y: i32 = X + 1; // trivial choice is X = 1, Y = n, Z = n * n. A simple reduction is X = 1, Y = n, Z = n * (n / 2) + (n + 1) / 2
@@ -321,7 +328,7 @@ fn main() {
 			}
 		}
 		for _ in 0..THREADS {
-			let filter = jobs_remaining; // copy of i, since lambda expression captures the variable
+			let filter = if RUN_JOBS_REVERSED { total_tasks as isize - jobs_remaining - 1 } else { jobs_remaining }; // copy of i, since lambda expression captures the variable
 			jobs_remaining -= 1;
 			match recorded_counts.get(&(filter as usize)) {
 				Some(prev_count) => {
@@ -361,7 +368,7 @@ fn main() {
 			print_w_time(overall_start_time, format!("tasks remaining: [{total_tasks}-{competed_tasks}={}]", total_tasks-competed_tasks));
 			// this needs to continue once more when jobs_remaining == 0
 			while jobs_remaining >= 0 {
-				let filter = jobs_remaining; // copy of i, since lambda expression captures the variable
+				let filter = if RUN_JOBS_REVERSED { total_tasks as isize - jobs_remaining - 1 } else { jobs_remaining }; // copy of i, since lambda expression captures the variable
 				jobs_remaining -= 1;
 
 				match recorded_counts.get(&(filter as usize)) {
