@@ -186,10 +186,7 @@ fn seconds_to_dur(s: f64) -> String {
 	let minutes = ((s - (days * 86400.0) - (hours * 3600.0)) / 60.0).floor();
 	let seconds = s - (days * 86400.0) - (hours * 3600.0) - (minutes * 60.0);
 	let fsec = format!("{}{:.3}", if seconds < 10.0 { "0" } else { "" }, seconds);
-	if days > 0.0 {
-		return format!("{} days {:0>2}h:{:0>2}m:{}s", days, hours, minutes, fsec);
-	}
-	return format!("{:0>2}h:{:0>2}m:{}s", hours, minutes, fsec);
+	return format!("{:0}d:{:0>2}h:{:0>2}m:{}s", days, hours, minutes, fsec);
 }
 
 fn print_w_time(start_time: Instant, message: String) {
