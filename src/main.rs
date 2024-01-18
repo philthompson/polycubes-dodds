@@ -350,7 +350,7 @@ fn main() {
 				},
 				None => {
 					//println!("no prev computed count for filter={filter}");
-					let handle = thread::spawn(move || count_extensions_subset(filter as usize));
+					let handle = thread::spawn(move || count_extensions_subset(filter as usize, overall_start_time));
 					tasks.push(handle);
 				}
 			}
@@ -391,7 +391,7 @@ fn main() {
 					},
 					None => {
 						//print_w_time(overall_start_time, format!("no prev computed count for filter={filter}"));
-						let handle = thread::spawn(move || count_extensions_subset(filter as usize));
+						let handle = thread::spawn(move || count_extensions_subset(filter as usize, overall_start_time));
 						tasks.push(handle);
 						break; // stop looping once we spawn a thread to replace the completed one
 					}
@@ -564,7 +564,7 @@ fn count_extensions(
 	return count;
 }
 
-fn count_extensions_subset(filter: usize) -> usize {
+fn count_extensions_subset(filter: usize, overall_start_time: Instant) -> usize {
 
 	unsafe {
 		let start_time = Instant::now();
@@ -582,11 +582,11 @@ fn count_extensions_subset(filter: usize) -> usize {
 			i = i.sub(1);
 		}
 
-		println!("started  count_extensions_subset with filter={filter}, N={N}, FILTER_DEPTH={FILTER_DEPTH}");
+		print_w_time(overall_start_time, format!("started  count_extensions_subset with filter={filter}, N={N}, FILTER_DEPTH={FILTER_DEPTH}"));
 		let count: usize = count_extensions_subset_inner(N as usize, ref_stack.add(1), ref_stack.add((N - 2) * 4 as usize), ref_stack, filter);
 
 		let time_elapsed = start_time.elapsed().as_secs_f64();
-		println!("finished count_extensions_subset with filter={filter}, N={N}, FILTER_DEPTH={FILTER_DEPTH}, took {} with count={count}", seconds_to_dur(time_elapsed));
+		print_w_time(overall_start_time, format!("finished count_extensions_subset with filter={filter}, N={N}, FILTER_DEPTH={FILTER_DEPTH}, took {} with count={count}", seconds_to_dur(time_elapsed)));
 		return count;
 	}
 }
