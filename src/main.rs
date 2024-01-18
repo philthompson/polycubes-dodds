@@ -339,7 +339,7 @@ fn main() {
 				recorded_counts.insert(recorded_count.2, recorded_count.3);
 			}
 		}
-		for _ in 0..THREADS {
+		while tasks.len() < THREADS {
 			let filter = if RUN_JOBS_REVERSED { total_tasks as isize - jobs_remaining - 1 } else { jobs_remaining }; // copy of i, since lambda expression captures the variable
 			jobs_remaining -= 1;
 			match recorded_counts.get(&(filter as usize)) {
