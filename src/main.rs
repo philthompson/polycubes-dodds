@@ -11,27 +11,16 @@ rust port cleanup and debugging by Phil Thompson in January 2024, along with cha
 
 -----
 
-as it stands now, the maximum number of threads needed (or AWS EC2 vCPUs) is 64,
+as it stands now, the maximum number of threads needed (or AWS EC2 vCPUs) is 32,
   even for n=22, because the slowest jobs run in ~5x the time as the fastest
 
 by starting tasks in reverse order (starting at filter=0, using RUN_JOBS_REVERSED=true)
-   it seems like it's possible that running with half the threads (32) will complete
-   in the same overall runtime as starting with the highest filter number with 64 threads
+   running with half the threads (32) will complete in the same overall runtime as
+   starting with the highest filter number with 64 threads
 
-since the longest-running tasks take about 5x as long to run as the shortest, there are
-   only a couple of them, and we can start those longest tasks first with RUN_JOBS_REVERSED=true,
-   it seems like running with a quarter of the threads (16) will complete in a similar
-   overall runtime as with RUN_JOBS_REVERSED=false on a 64-thread machine
-
-for n=17, by FILTER_DEPTH:
-5 -> 46 + 1 worker tasks (including 0th task)
-6 -> 42 + 1 worker tasks (including 0th task)
-7 -> 38 + 1 worker tasks (including 0th task)
-
-for n=18, by FILTER_DEPTH:
-5 -> 50 + 1 worker tasks (including 0th task)
-6 -> 46 + 1 worker tasks (including 0th task)
-7 -> 42 + 1 worker tasks (including 0th task)
+it is possible to use even fewer threads (16) to have a somewhat longer running time
+   but at lower overall AWS EC2 cost -- see this blog post for details:
+   https://philthompson.me/2024/Counting-Polycubes-of-Size-21.html
 
 for n=20, by FILTER_DEPTH:
 5 -> 58 + 1 worker tasks (including 0th task)
@@ -60,17 +49,19 @@ use std::collections::BTreeSet;
 
 const N: usize = 14; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
 const FILTER_DEPTH: usize = 5;
-const THREADS: usize = 2;
+const THREADS: usize = 8;
 const USE_PRECOMPUTED_SYMM: bool = true; // use precomputed nontrivial symmetries, if available
 // the first portion of the program computes "nontrivial symmetries" which is much
 //   faster than the second portion of the program.  if running a high n value, or
 //   piping output to a file, then set this to false
 const SHOW_NONTRIVIAL_SYMM_ETA: bool = true;
-// set this to true to reduce overall idle CPU time (and thus cost) if the number of threads
-//   is around half the total number of "trivial symmetry" worker tasks (for example,
-//   computing for n=22, a 64-thread machine should run with RUN_JOBS_REVERSED=false in the
-//   same overall time as a 32-thread machine with RUN_JOBS_REVERSED=true)
-// set this to false to run the fastest "trivial symmetry" worker tasks first
+// set RUN_JOBS_REVERSED=false to start the fastest "trivial symmetry" worker tasks first
+// set RUN_JOBS_REVERSED=true to start the slowest tasks first
+// when reversed, this will reduce overall idle CPU time (and thus on-demand compute
+//   cost) if THREADS is ~ 1/3 - 1/2 the number of "trivial symmetry" worker tasks
+// for example, for n=18 or n=22, 64 threads with RUN_JOBS_REVERSED=false will
+//   run in the same overall time as a 32 threads with RUN_JOBS_REVERSED=true
+// (see above note and blog post link)
 const RUN_JOBS_REVERSED: bool = true;
 
 const X: i32 = (N as i32 + 5) / 4 * ((N as i32 + 5) / 4 * 3 - 2); // set X<Y<Z such that aX+bY+cZ = 0 implies a = b = c = 0 or |a|+|b|+|c| > n
@@ -121,7 +112,6 @@ const BIASES: [[i32; 3]; 4] = [
 
 // with the USE_PRECOMPUTED_SYMM constant:
 // lets us optionally use previously-calculated values here
-//   (for n=22, this portion took 2.5 hours on my M1 mac)
 const NONTRIVIAL_SYMMETRIES_COUNTS: [usize; 23] = [0,
 	/* n=1  */             0,
 	/* n=2  */             0,
@@ -249,8 +239,7 @@ fn seconds_to_dur(s: f64) -> String {
 	let hours = ((s - (days * 86400.0)) / 3600.0).floor();
 	let minutes = ((s - (days * 86400.0) - (hours * 3600.0)) / 60.0).floor();
 	let seconds = s - (days * 86400.0) - (hours * 3600.0) - (minutes * 60.0);
-	let fsec = format!("{}{:.3}", if seconds < 10.0 { "0" } else { "" }, seconds);
-	return format!("{:0}d:{:0>2}h:{:0>2}m:{}s", days, hours, minutes, fsec);
+	return format!("{:0}d:{:0>2}h:{:0>2}m:{:.3}s", days, hours, minutes, seconds);
 }
 
 fn print_w_time(start_time: Instant, message: String) {
@@ -519,7 +508,6 @@ fn count_extensions(
 			let mut temp_x = x;
 			let mut temp_y = y;
 			let mut temp_z = z;
-			//let mut iter: usize = 0; // iter is just for debugging and can be removed later
 			loop // works for general transformations of finite order
 			{
 				let (tx, ty, tz) = (
