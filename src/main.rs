@@ -140,7 +140,7 @@ const NONTRIVIAL_SYMMETRIES_COUNTS: [usize; 23] = [0,
 	/* n=15 */     2_446_834,
 	/* n=16 */     8_460_765,
 	/* n=17 */    18_283_068,
-	/* n=18 */             0,
+	/* n=18 */    63_525_537,
 	/* n=19 */             0,
 	/* n=20 */             0,
 	/* n=21 */ 1_055_564_170,
@@ -151,27 +151,91 @@ const NONTRIVIAL_SYMMETRIES_COUNTS: [usize; 23] = [0,
 // this allows us to resume cancelled runs while keeping everything
 //   contained in this single file
 // comment these out to re-compute them
-const TRIVIAL_SYMMETRIES_COUNTS_BY_N_FILTER_DEPTH_FILTER: [(usize, usize, usize, usize); 18] = [
+const TRIVIAL_SYMMETRIES_COUNTS_BY_N_FILTER_DEPTH_FILTER: [(usize, usize, usize, usize); 81] = [
 	//N, FILTER_DEPTH, filter, count
 	(15, 5, 7, 10309337032),
 	(15, 5, 8, 11262164848),
 	(15, 5, 9, 12390196930),
 	(15, 5, 10, 12870871661),
 	// N=17
-	(17, 5, 22, 223300442187),
-	(17, 5, 21, 275122791064),
-	(17, 5, 20, 330993580186),
-	(17, 5, 19, 391147998151),
-	(17, 5, 18, 452126433401),
-	(17, 5, 17, 511440046465),
-	(17, 5, 16, 567012434999),
-	(17, 5, 15, 618080954784),
-	(17, 5, 14, 655564999981),
-	(17, 5, 9, 646961888347),
-	(17, 5, 8, 583673049457),
-	(17, 5, 7, 529479491501),
-	(17, 5, 6, 461683597993),
 	(17, 5, 4, 289836494778),
+	(17, 5, 6, 461683597993),
+	(17, 5, 7, 529479491501),
+	(17, 5, 8, 583673049457),
+	(17, 5, 9, 646961888347),
+	(17, 5, 14, 655564999981),
+	(17, 5, 15, 618080954784),
+	(17, 5, 16, 567012434999),
+	(17, 5, 17, 511440046465),
+	(17, 5, 18, 452126433401),
+	(17, 5, 19, 391147998151),
+	(17, 5, 20, 330993580186),
+	(17, 5, 21, 275122791064),
+	(17, 5, 22, 223300442187),
+	// N=21
+	(21, 5, 0, 309420173722300),   // took 2d:17h:12m on an AWS EC2 c7g instance
+	(21, 5, 1, 345395528117841),   // took 3d:00h:52m on an AWS EC2 c7g instance
+	(21, 5, 2, 512845497549304),   // took 3d:16h:02m on an AWS EC2 c7g instance
+	(21, 5, 3, 696292340206626),   // took 4d:07h:12m on an AWS EC2 c7g instance
+	(21, 5, 4, 863102288279808),   // took 4d:19h:21m on an AWS EC2 c7g instance
+	(21, 5, 5, 1153440327911952),  // took 5d:12h:03m on an AWS EC2 c7g instance
+	(21, 5, 6, 1387546375414082),  // took 5d:22h:44m on an AWS EC2 c7g instance
+	(21, 5, 7, 1605849914003528),  // took 6d:05h:44m on an AWS EC2 c7g instance
+	(21, 5, 8, 1787870546368474),  // took 6d:08h:08m on an AWS EC2 c7g instance
+	(21, 5, 9, 1997960513986194),  // took 6d:09h:40m on an AWS EC2 c7g instance
+	(21, 5, 10, 2119506128616415), // took 6d:06h:47m on an AWS EC2 c7g instance
+	(21, 5, 11, 2202018997735872), // took 6d:01h:04m on an AWS EC2 c7g instance
+	(21, 5, 12, 2244177905798528), // took 5d:18h:05m on an AWS EC2 c7g instance
+	(21, 5, 13, 2248001799465557), // took 5d:09h:53m on an AWS EC2 c7g instance
+	(21, 5, 14, 2198464880362828), // took 5d:00h:26m on an AWS EC2 c7g instance
+	(21, 5, 15, 2125278404299050), // took 4d:15h:04m on an AWS EC2 c7g instance
+	(21, 5, 16, 2010116122002288), // took 4d:05h:33m on an AWS EC2 c7g instance
+	(21, 5, 17, 1876807006549215), // took 3d:20h:29m on an AWS EC2 c7g instance
+	(21, 5, 18, 1725640003589544), // took 3d:12h:03m on an AWS EC2 c7g instance
+	(21, 5, 19, 1562659895679425), // took 3d:04h:18m on an AWS EC2 c7g instance
+	(21, 5, 20, 1393374663858664), // took 2d:21h:18m on an AWS EC2 c7g instance
+	(21, 5, 21, 1226996979655412), // took 2d:15h:09m on an AWS EC2 c7g instance
+	(21, 5, 22, 1063878243997825), // took 2d:09h:46m on an AWS EC2 c7g instance
+	(21, 5, 23, 909715901464397),  // took 2d:05h:09m on an AWS EC2 c7g instance
+	(21, 5, 24, 767003283534118),  // took 2d:01h:14m on an AWS EC2 c7g instance
+	(21, 5, 25, 637664564613305),  // took 1d:21h:57m on an AWS EC2 c7g instance
+	(21, 5, 26, 522253112618485),  // took 1d:19h:16m on an AWS EC2 c7g instance
+	(21, 5, 27, 421693153196302),  // took 1d:17h:04m on an AWS EC2 c7g instance
+	(21, 5, 28, 335497140472044),  // took 1d:15h:19m on an AWS EC2 c7g instance
+	(21, 5, 29, 263031935220780),  // took 1d:13h:57m on an AWS EC2 c7g instance
+	(21, 5, 30, 203070780532962),  // took 1d:12h:51m on an AWS EC2 c7g instance
+	(21, 5, 31, 154382100269004),  // took 1d:12h:01m on an AWS EC2 c7g instance
+	(21, 5, 32, 115559882167060),  // took 1d:11h:24m on an AWS EC2 c7g instance
+	(21, 5, 33, 85152304485303),   // took 1d:10h:56m on an AWS EC2 c7g instance
+	(21, 5, 34, 61710362959494),   // took 1d:10h:35m on an AWS EC2 c7g instance
+	(21, 5, 35, 43982755199356),   // took 1d:10h:21m on an AWS EC2 c7g instance
+	(21, 5, 36, 30822164177826),   // took 1d:10h:09m on an AWS EC2 c7g instance
+	(21, 5, 37, 21225762905510),   // took 1d:10h:02m on an AWS EC2 c7g instance
+	(21, 5, 38, 14350322250780),   // took 1d:09h:56m on an AWS EC2 c7g instance
+	(21, 5, 39, 9520721822656),    // took 0d:21h:55m on an M1 Mac mini
+	(21, 5, 40, 6196997682686),    // took 0d:21h:53m on an M1 Mac mini
+	(21, 5, 41, 3955593817336),    // took 0d:21h:52m on an M1 Mac mini
+	(21, 5, 42, 2471981286083),    // took 0d:21h:51m on an M1 Mac mini
+	(21, 5, 43, 1511722821800),    // took 0d:22h:30m on an M1 Mac mini
+	(21, 5, 44, 904967465059),     // took 0d:22h:29m on an M1 Mac mini
+	(21, 5, 45, 529652026618),     // took 0d:22h:29m on an M1 Mac mini
+	(21, 5, 46, 303040281933),     // took 0d:22h:29m on an M1 Mac mini
+	(21, 5, 47, 168852583688),     // took 0d:21h:50m on an M1 Mac mini
+	(21, 5, 48, 91752335576),      // took 0d:21h:50m on an M1 Mac mini
+	(21, 5, 49, 48862051752),      // took 0d:21h:50m on an M1 Mac mini
+	(21, 5, 50, 25216528208),      // took 0d:21h:50m on an M1 Mac mini
+	(21, 5, 51, 12578787374),      // took 0d:21h:51m on an M1 Mac mini
+	(21, 5, 52, 6221625934),       // took 0d:21h:51m on an M1 Mac mini
+	(21, 5, 53, 2898865668),       // took 0d:21h:51m on an M1 Mac mini
+	(21, 5, 54, 1307081085),       // took 0d:21h:51m on an M1 Mac mini
+	(21, 5, 55, 623956362),        // took 0d:22h:09m on an M1 Mac mini
+	(21, 5, 56, 254705772),        // took 0d:22h:09m on an M1 Mac mini
+	(21, 5, 57, 83869444),         // took 0d:22h:09m on an M1 Mac mini
+	(21, 5, 58, 46709392),         // took 0d:22h:09m on an M1 Mac mini
+	(21, 5, 59, 19610164),         // took 0d:21h:52m on an M1 Mac mini
+	(21, 5, 60, 2192944),          // took 0d:21h:52m on an M1 Mac mini
+	(21, 5, 61, 1157758),          // took 0d:21h:52m on an M1 Mac mini
+	(21, 5, 62, 1291256),          // took 0d:21h:52m on an M1 Mac mini
 ];
 
 // for smaller values of N, we can greatly speed up computation by
