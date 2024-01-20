@@ -239,11 +239,11 @@ fn seconds_to_dur(s: f64) -> String {
 	let hours = ((s - (days * 86400.0)) / 3600.0).floor();
 	let minutes = ((s - (days * 86400.0) - (hours * 3600.0)) / 60.0).floor();
 	let seconds = s - (days * 86400.0) - (hours * 3600.0) - (minutes * 60.0);
-	return format!("{:0}d:{:0>2}h:{:0>2}m:{:.3}s", days, hours, minutes, seconds);
+	return format!("{:0>3}d:{:0>2}h:{:0>2}m:{:0>6.3}s", days, hours, minutes, seconds);
 }
 
 fn print_w_time(start_time: Instant, message: String) {
-	println!("[{}]: {message}", seconds_to_dur(start_time.elapsed().as_secs_f64()));
+	println!("[{}] {message}", seconds_to_dur(start_time.elapsed().as_secs_f64()));
 }
 
 // thanks to https://stackoverflow.com/a/67834588/259456
