@@ -1,0 +1,202 @@
+used precomputed nontrivial symmetries count:
+total count for nontrivial symmetries is 1055564170 for polycubes with 21 cells
+Took 00h:00m:00.000s
+[00h:00m:00.000s]: 
+Counting polycubes via extensions...
+N=21, n_sleep_millis=2100
+started  count_extensions_subset with filter=0, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=1, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=2, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=5, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=4, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=3, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=7, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=6, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=8, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=9, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=10, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=11, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=12, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=13, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=14, N=21, FILTER_DEPTH=5
+started  count_extensions_subset with filter=15, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=0, N=21, FILTER_DEPTH=5, took 2 days 17h:12m:25.308s with count=309420173722300
+[2 days 17h:12m:26.216s]: tasks remaining: [63-1=62]
+started  count_extensions_subset with filter=16, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=1, N=21, FILTER_DEPTH=5, took 3 days 00h:52m:43.240s with count=345395528117841
+[3 days 00h:52m:44.033s]: tasks remaining: [63-2=61]
+started  count_extensions_subset with filter=17, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=2, N=21, FILTER_DEPTH=5, took 3 days 16h:02m:16.831s with count=512845497549304
+[3 days 16h:02m:18.148s]: tasks remaining: [63-3=60]
+started  count_extensions_subset with filter=18, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=3, N=21, FILTER_DEPTH=5, took 4 days 07h:12m:31.960s with count=696292340206626
+[4 days 07h:12m:32.170s]: tasks remaining: [63-4=59]
+started  count_extensions_subset with filter=19, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=15, N=21, FILTER_DEPTH=5, took 4 days 15h:04m:32.009s with count=2125278404299050
+[4 days 15h:04m:33.506s]: tasks remaining: [63-5=58]
+started  count_extensions_subset with filter=20, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=4, N=21, FILTER_DEPTH=5, took 4 days 19h:21m:31.698s with count=863102288279808
+[4 days 19h:21m:32.107s]: tasks remaining: [63-6=57]
+started  count_extensions_subset with filter=21, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=14, N=21, FILTER_DEPTH=5, took 5 days 00h:26m:07.346s with count=2198464880362828
+[5 days 00h:26m:08.882s]: tasks remaining: [63-7=56]
+started  count_extensions_subset with filter=22, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=13, N=21, FILTER_DEPTH=5, took 5 days 09h:53m:34.756s with count=2248001799465557
+[5 days 09h:53m:35.001s]: tasks remaining: [63-8=55]
+started  count_extensions_subset with filter=23, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=5, N=21, FILTER_DEPTH=5, took 5 days 12h:03m:40.500s with count=1153440327911952
+[5 days 12h:03m:40.903s]: tasks remaining: [63-9=54]
+started  count_extensions_subset with filter=24, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=12, N=21, FILTER_DEPTH=5, took 5 days 18h:05m:28.567s with count=2244177905798528
+[5 days 18h:05m:29.169s]: tasks remaining: [63-10=53]
+started  count_extensions_subset with filter=25, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=6, N=21, FILTER_DEPTH=5, took 5 days 22h:44m:17.050s with count=1387546375414082
+[5 days 22h:44m:18.202s]: tasks remaining: [63-11=52]
+started  count_extensions_subset with filter=26, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=11, N=21, FILTER_DEPTH=5, took 6 days 01h:04m:28.535s with count=2202018997735872
+[6 days 01h:04m:28.923s]: tasks remaining: [63-12=51]
+started  count_extensions_subset with filter=27, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=7, N=21, FILTER_DEPTH=5, took 6 days 05h:44m:49.955s with count=1605849914003528
+[6 days 05h:44m:50.359s]: tasks remaining: [63-13=50]
+started  count_extensions_subset with filter=28, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=10, N=21, FILTER_DEPTH=5, took 6 days 06h:47m:57.524s with count=2119506128616415
+[6 days 06h:47m:58.858s]: tasks remaining: [63-14=49]
+started  count_extensions_subset with filter=29, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=8, N=21, FILTER_DEPTH=5, took 6 days 08h:08m:30.053s with count=1787870546368474
+[6 days 08h:08m:31.084s]: tasks remaining: [63-15=48]
+started  count_extensions_subset with filter=30, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=9, N=21, FILTER_DEPTH=5, took 6 days 09h:40m:53.387s with count=1997960513986194
+[6 days 09h:40m:55.227s]: tasks remaining: [63-16=47]
+started  count_extensions_subset with filter=31, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=17, N=21, FILTER_DEPTH=5, took 3 days 20h:29m:51.685s with count=1876807006549215
+[6 days 21h:22m:37.120s]: tasks remaining: [63-17=46]
+started  count_extensions_subset with filter=32, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=16, N=21, FILTER_DEPTH=5, took 4 days 05h:33m:40.911s with count=2010116122002288
+[6 days 22h:46m:07.850s]: tasks remaining: [63-18=45]
+started  count_extensions_subset with filter=33, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=18, N=21, FILTER_DEPTH=5, took 3 days 12h:03m:54.144s with count=1725640003589544
+[7 days 04h:06m:12.849s]: tasks remaining: [63-19=44]
+started  count_extensions_subset with filter=34, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=22, N=21, FILTER_DEPTH=5, took 2 days 09h:46m:46.926s with count=1063878243997825
+[7 days 10h:12m:57.219s]: tasks remaining: [63-20=43]
+started  count_extensions_subset with filter=35, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=21, N=21, FILTER_DEPTH=5, took 2 days 15h:09m:25.043s with count=1226996979655412
+[7 days 10h:30m:58.747s]: tasks remaining: [63-21=42]
+started  count_extensions_subset with filter=36, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=19, N=21, FILTER_DEPTH=5, took 3 days 04h:18m:23.281s with count=1562659895679425
+[7 days 11h:30m:56.140s]: tasks remaining: [63-22=41]
+started  count_extensions_subset with filter=37, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=20, N=21, FILTER_DEPTH=5, took 2 days 21h:18m:44.245s with count=1393374663858664
+[7 days 12h:23m:17.821s]: tasks remaining: [63-23=40]
+started  count_extensions_subset with filter=38, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=24, N=21, FILTER_DEPTH=5, took 2 days 01h:14m:45.975s with count=767003283534118
+[7 days 13h:18m:27.507s]: tasks remaining: [63-24=39]
+started  count_extensions_subset with filter=39, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=23, N=21, FILTER_DEPTH=5, took 2 days 05h:09m:29.357s with count=909715901464397
+[7 days 15h:03m:04.570s]: tasks remaining: [63-25=38]
+started  count_extensions_subset with filter=40, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=25, N=21, FILTER_DEPTH=5, took 1 days 21h:57m:13.943s with count=637664564613305
+[7 days 16h:02m:45.163s]: tasks remaining: [63-26=37]
+started  count_extensions_subset with filter=41, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=26, N=21, FILTER_DEPTH=5, took 1 days 19h:16m:25.155s with count=522253112618485
+[7 days 18h:00m:44.447s]: tasks remaining: [63-27=36]
+started  count_extensions_subset with filter=42, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=27, N=21, FILTER_DEPTH=5, took 1 days 17h:04m:43.622s with count=421693153196302
+[7 days 18h:09m:12.661s]: tasks remaining: [63-28=35]
+started  count_extensions_subset with filter=43, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=29, N=21, FILTER_DEPTH=5, took 1 days 13h:57m:04.611s with count=263031935220780
+[7 days 20h:45m:04.224s]: tasks remaining: [63-29=34]
+started  count_extensions_subset with filter=44, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=30, N=21, FILTER_DEPTH=5, took 1 days 12h:51m:56.136s with count=203070780532962
+[7 days 21h:00m:28.248s]: tasks remaining: [63-30=33]
+started  count_extensions_subset with filter=45, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=28, N=21, FILTER_DEPTH=5, took 1 days 15h:19m:27.765s with count=335497140472044
+[7 days 21h:04m:19.254s]: tasks remaining: [63-31=32]
+started  count_extensions_subset with filter=46, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=31, N=21, FILTER_DEPTH=5, took 1 days 12h:01m:31.313s with count=154382100269004
+[7 days 21h:42m:28.314s]: tasks remaining: [63-32=31]
+started  count_extensions_subset with filter=47, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=32, N=21, FILTER_DEPTH=5, took 1 days 11h:24m:12.142s with count=115559882167060
+[8 days 08h:46m:49.445s]: tasks remaining: [63-33=30]
+started  count_extensions_subset with filter=48, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=33, N=21, FILTER_DEPTH=5, took 1 days 10h:56m:02.422s with count=85152304485303
+[8 days 09h:42m:11.731s]: tasks remaining: [63-34=29]
+started  count_extensions_subset with filter=49, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=34, N=21, FILTER_DEPTH=5, took 1 days 10h:35m:23.004s with count=61710362959494
+[8 days 14h:41m:37.695s]: tasks remaining: [63-35=28]
+started  count_extensions_subset with filter=50, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=35, N=21, FILTER_DEPTH=5, took 1 days 10h:21m:09.796s with count=43982755199356
+[8 days 20h:34m:07.342s]: tasks remaining: [63-36=27]
+started  count_extensions_subset with filter=51, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=36, N=21, FILTER_DEPTH=5, took 1 days 10h:09m:27.634s with count=30822164177826
+[8 days 20h:40m:27.452s]: tasks remaining: [63-37=26]
+started  count_extensions_subset with filter=52, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=37, N=21, FILTER_DEPTH=5, took 1 days 10h:02m:06.005s with count=21225762905510
+[8 days 21h:33m:03.834s]: tasks remaining: [63-38=25]
+started  count_extensions_subset with filter=53, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=38, N=21, FILTER_DEPTH=5, took 1 days 09h:56m:42.928s with count=14350322250780
+[8 days 22h:20m:02.106s]: tasks remaining: [63-39=24]
+started  count_extensions_subset with filter=54, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=39, N=21, FILTER_DEPTH=5, took 1 days 09h:54m:28.159s with count=9520721822656
+[8 days 23h:12m:57.388s]: tasks remaining: [63-40=23]
+started  count_extensions_subset with filter=55, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=40, N=21, FILTER_DEPTH=5, took 1 days 09h:52m:12.136s with count=6196997682686
+[9 days 00h:55m:17.947s]: tasks remaining: [63-41=22]
+started  count_extensions_subset with filter=56, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=41, N=21, FILTER_DEPTH=5, took 1 days 09h:49m:30.687s with count=3955593817336
+[9 days 01h:52m:16.835s]: tasks remaining: [63-42=21]
+started  count_extensions_subset with filter=57, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=42, N=21, FILTER_DEPTH=5, took 1 days 09h:50m:16.139s with count=2471981286083
+[9 days 03h:51m:02.319s]: tasks remaining: [63-43=20]
+started  count_extensions_subset with filter=58, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=43, N=21, FILTER_DEPTH=5, took 1 days 09h:48m:36.787s with count=1511722821800
+[9 days 03h:57m:49.730s]: tasks remaining: [63-44=19]
+started  count_extensions_subset with filter=59, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=44, N=21, FILTER_DEPTH=5, took 1 days 09h:49m:21.679s with count=904967465059
+[9 days 06h:34m:27.473s]: tasks remaining: [63-45=18]
+started  count_extensions_subset with filter=60, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=45, N=21, FILTER_DEPTH=5, took 1 days 09h:47m:57.172s with count=529652026618
+[9 days 06h:48m:27.495s]: tasks remaining: [63-46=17]
+started  count_extensions_subset with filter=61, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=46, N=21, FILTER_DEPTH=5, took 1 days 09h:48m:03.881s with count=303040281933
+[9 days 06h:52m:24.801s]: tasks remaining: [63-47=16]
+started  count_extensions_subset with filter=62, N=21, FILTER_DEPTH=5
+finished count_extensions_subset with filter=47, N=21, FILTER_DEPTH=5, took 1 days 09h:47m:32.886s with count=168852583688
+[9 days 07h:30m:02.360s]: tasks remaining: [63-48=15]
+finished count_extensions_subset with filter=48, N=21, FILTER_DEPTH=5, took 1 days 09h:47m:55.971s with count=91752335576
+[9 days 18h:34m:46.582s]: tasks remaining: [63-49=14]
+finished count_extensions_subset with filter=49, N=21, FILTER_DEPTH=5, took 1 days 09h:47m:58.768s with count=48862051752
+[9 days 19h:30m:10.967s]: tasks remaining: [63-50=13]
+finished count_extensions_subset with filter=50, N=21, FILTER_DEPTH=5, took 1 days 09h:47m:45.984s with count=25216528208
+[10 days 00h:29m:24.323s]: tasks remaining: [63-51=12]
+finished count_extensions_subset with filter=51, N=21, FILTER_DEPTH=5, took 1 days 09h:48m:38.027s with count=12578787374
+[10 days 06h:22m:46.492s]: tasks remaining: [63-52=11]
+finished count_extensions_subset with filter=52, N=21, FILTER_DEPTH=5, took 1 days 09h:48m:01.357s with count=6221625934
+[10 days 06h:28m:30.901s]: tasks remaining: [63-53=10]
+finished count_extensions_subset with filter=53, N=21, FILTER_DEPTH=5, took 1 days 09h:47m:56.445s with count=2898865668
+[10 days 07h:21m:00.974s]: tasks remaining: [63-54=9]
+finished count_extensions_subset with filter=54, N=21, FILTER_DEPTH=5, took 1 days 09h:47m:40.703s with count=1307081085
+[10 days 08h:07m:44.542s]: tasks remaining: [63-55=8]
+finished count_extensions_subset with filter=55, N=21, FILTER_DEPTH=5, took 1 days 09h:49m:20.691s with count=623956362
+[10 days 09h:02m:18.520s]: tasks remaining: [63-56=7]
+finished count_extensions_subset with filter=56, N=21, FILTER_DEPTH=5, took 1 days 09h:49m:07.951s with count=254705772
+[10 days 10h:44m:26.460s]: tasks remaining: [63-57=6]
+finished count_extensions_subset with filter=57, N=21, FILTER_DEPTH=5, took 1 days 09h:46m:24.941s with count=83869444
+[10 days 11h:38m:43.635s]: tasks remaining: [63-58=5]
+finished count_extensions_subset with filter=58, N=21, FILTER_DEPTH=5, took 1 days 09h:48m:58.098s with count=46709392
+[10 days 13h:40m:02.402s]: tasks remaining: [63-59=4]
+finished count_extensions_subset with filter=59, N=21, FILTER_DEPTH=5, took 1 days 09h:47m:31.260s with count=19610164
+[10 days 13h:45m:21.609s]: tasks remaining: [63-60=3]
+finished count_extensions_subset with filter=60, N=21, FILTER_DEPTH=5, took 1 days 09h:49m:09.996s with count=2192944
+[10 days 16h:23m:38.013s]: tasks remaining: [63-61=2]
+finished count_extensions_subset with filter=61, N=21, FILTER_DEPTH=5, took 1 days 09h:48m:01.687s with count=1157758
+[10 days 16h:36m:30.829s]: tasks remaining: [63-62=1]
+finished count_extensions_subset with filter=62, N=21, FILTER_DEPTH=5, took 1 days 09h:48m:13.267s with count=1291256
+[10 days 16h:40m:38.634s]: tasks remaining: [63-63=0]
+
+
+39269513463794006 polycubes with 21 cells (number of polycubes fixed by trivial symmetry)
+Took 10 days 16h:40m:38.634s
+
+1,636,229,771,639,924 free polycubes with 21 cells
+overall time: 10 days 16h:40m:38.634s
