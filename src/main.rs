@@ -57,6 +57,7 @@ const N: usize = 15; // number of polycube cells. Need n >= 4 if single threadin
 const FILTER_DEPTH: usize = 5; // keep this at 5 to divide the work among the most worker tasks
 const THREADS: usize = 4;
 const USE_PRECOMPUTED_SYMM: bool = true; // use precomputed nontrivial symmetries, if available
+
 // the first portion of the program computes "nontrivial symmetries" which is much
 //   faster than the second portion of the program.  if running a high n value, or
 //   piping output to a file, then set this to false
