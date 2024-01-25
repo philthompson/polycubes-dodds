@@ -3,6 +3,14 @@ name = "polycubes-dodds"
 version = "0.1.0"
 edition = "2021"
 
+# thanks to https://stackoverflow.com/a/36604610/259456
+[[bin]]
+name = "polycubes-v1"
+path = "src/mainv1.rs"
+
+[[bin]]
+name = "polycubes-v2"
+path = "src/mainv2.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

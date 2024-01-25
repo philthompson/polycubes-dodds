@@ -53,7 +53,7 @@ use std::collections::BTreeSet;
 // this import needed depending on rust toolchain (e.g. on Amazon Linux)
 //use std::convert::TryInto;
 
-const N: usize = 15; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
+const N: usize = 8; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
 const FILTER_DEPTH: usize = 5; // keep this at 5 to divide the work among the most worker tasks
 const THREADS: usize = 4;
 const USE_PRECOMPUTED_SYMM: bool = true; // use precomputed nontrivial symmetries, if available
@@ -682,7 +682,23 @@ fn count_extensions_subset_inner(depth: usize, mut stack_top_1: *mut *mut u8, mu
 
 			if depth == 4 {
 				count += count_extensions_subset_final(stack_top_inner, ref_stack);
+			// apparently if we use some arbitrary condition to decide whether to proceed,
+			//   we can divide up the work among many more threads
+			// Dodds, as a proof of concept, just used a small integer for uniqueness
+			//   between threads and just checked something arbitrary -- here the length of a stack
+			// print out a bunch of things to find something else that can be used as
+			//   a splitting point for individual threads:
+			//   - stack_top_2.offset_from(ref_stack) - this doesn't reach the same number of values for each thread
+			//   - 
+			// ANOTHER option Dodds mentioned is to run this first common portion once, then
+			//   split out the thread tasks from there (but that requires duplicating all the
+			//   state for each thread, so maybe that idea can stay on the back burner for now)
 			} else if depth != FILTER_DEPTH || stack_top_1.offset_from(ref_stack) == filter_stop {
+				//if depth == FILTER_DEPTH {
+				//	// these don't reach the same number of branches for each thread
+				//	//println!("stack_top_1 is offset from ref_stack by [{}], stack_top_2 is offset from ref_stack by [{}]", stack_top_1.offset_from(ref_stack), stack_top_2.offset_from(ref_stack));
+				//	println!("stack_top_1 is offset from ref_stack by [{}], *index.sub(X as usize)=[{}]", stack_top_1.offset_from(ref_stack), *index.sub(X as usize));
+				//}
 				count += count_extensions_subset_inner(depth - 1, stack_top_inner, stack_top_2, ref_stack, filter); // if multithreading is not wanted, remove "if (condition)" from this else statement
 			}
 			*index.sub(X as usize) = (*index.sub(X as usize)).wrapping_sub(1);
