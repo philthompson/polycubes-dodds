@@ -53,7 +53,7 @@ use std::collections::BTreeSet;
 // this import needed depending on rust toolchain (e.g. on Amazon Linux)
 //use std::convert::TryInto;
 
-const N: usize = 8; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
+const N: usize = 15; // number of polycube cells. Need n >= 4 if single threading, or n >= filterDepth >= 5 if multithreading (I think)
 const FILTER_DEPTH: usize = 5; // keep this at 5 to divide the work among the most worker tasks
 const THREADS: usize = 4;
 const USE_PRECOMPUTED_SYMM: bool = true; // use precomputed nontrivial symmetries, if available
@@ -373,7 +373,7 @@ fn main() {
 		let mut tasks = Vec::new(); // please don't judge my multithreading - this was basically just my first attempt, to see if it helped
 		let mut jobs_remaining: isize = (4 * (N as i32 - FILTER_DEPTH as i32) - 2).try_into().unwrap(); // this is the maximum left stack length, which is the value being filtered to separate work
 		let total_tasks: usize = (jobs_remaining as usize) + 1;
-		let mut competed_tasks: usize = 0;
+		let mut completed_tasks: usize = 0;
 		// see if any previously-recorded jobs' counts are available
 		let mut recorded_counts: BTreeMap<usize, usize> = BTreeMap::new();
 		for recorded_count in TRIVIAL_SYMMETRIES_COUNTS_BY_N_FILTER_DEPTH_FILTER {
@@ -389,7 +389,7 @@ fn main() {
 				Some(prev_count) => {
 					println!("using previously-recorded count [{prev_count}] for (N={N}, FILTER_DEPTH={FILTER_DEPTH}, filter={filter})");
 					subcount += prev_count;
-					competed_tasks += 1;
+					completed_tasks += 1;
 				},
 				None => {
 					//println!("no prev computed count for filter={filter}");
@@ -419,8 +419,8 @@ fn main() {
 				continue;
 			}
 			subcount += tasks.remove(handle_index_to_replace.take().unwrap()).join().unwrap();
-			competed_tasks += 1;
-			print_w_time(overall_start_time, format!("tasks remaining: [{total_tasks}-{competed_tasks}={}]", total_tasks-competed_tasks));
+			completed_tasks += 1;
+			print_w_time(overall_start_time, format!("tasks remaining: [{total_tasks}-{completed_tasks}={}]", total_tasks-completed_tasks));
 			// this needs to continue once more when jobs_remaining == 0
 			while jobs_remaining >= 0 {
 				let filter = if RUN_JOBS_REVERSED { total_tasks as isize - jobs_remaining - 1 } else { jobs_remaining }; // copy of i, since lambda expression captures the variable
@@ -430,7 +430,7 @@ fn main() {
 					Some(prev_count) => {
 						print_w_time(overall_start_time, format!("using previously-recorded count [{prev_count}] for (N={N}, FILTER_DEPTH={FILTER_DEPTH}, filter={filter})"));
 						subcount += prev_count;
-						competed_tasks += 1;
+						completed_tasks += 1;
 					},
 					None => {
 						//print_w_time(overall_start_time, format!("no prev computed count for filter={filter}"));
