@@ -40,7 +40,7 @@ use std::time::Instant;
 use std::thread;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-// this import needed depending on rust toolchain (e.g. on Amazon Linux)
+// this import needed depending on rust toolchain? or edition? (e.g. on Amazon Linux)
 //use std::convert::TryInto;
 
 const N: usize = 16; // number of polycube cells
@@ -50,6 +50,8 @@ const USE_PRECOMPUTED_SYMM: bool = true; // use precomputed nontrivial symmetrie
 
 // output checkpoint count+finished tasks info no more often than this many seconds
 const CHECKPOINT_SECONDS: f32 = 15.0;
+
+const PLACEHOLDER_REF_STACK_OFFSET: isize = -123456; // if this is changed, the task hashes will change and any previous checkpoints will no longer work
 
 // the first portion of the program computes "nontrivial symmetries" which is much
 //   faster than the second portion of the program.  if running a high n value, or
@@ -134,7 +136,8 @@ const NONTRIVIAL_SYMMETRIES_COUNTS: [usize; 23] = [0,
 	/* n=21 */ 1_055_564_170,
 	/* n=22 */ 3_699_765_374];
 
-const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, usize); 6] = [
+// comment these out if wanting to re-calculate
+const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, usize); 10] = [
 	// N, FILTER_DEPTH, task hash, cumulative free polycubes count
 	(16, 10, 14250364139652756278, 1113840924125),
 	(16, 12, 9317956767031721395, 622727856628),
@@ -143,13 +146,19 @@ const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, usize); 6] = [
 
 	(17, 12, 10306999600203458141, 6036447860508),
 	(17, 12, 14726552232942904259, 8794072714458),
+
+	(22, 13, 4882944094302709, 89552651750264),
+	(22, 13, 7624875869015158, 126084150825247),
+
+	(22, 14, 7391011772847126, 92455770341602),
+	(22, 14, 22599905593694915, 333264506359726),
 ];
 
 // for smaller values of N, we can greatly speed up computation by
 //   lowering the sleep time used when waiting for threads to finish
 // for larger values of N, we can check less often and waste fewer
 //   cycles in the main thread
-const N_SLEEP_MILLIS: u64 = if N > 19 { N as u64 * 100 } else if N > 17 { N as u64 * 25 } else if N > 12 { N as u64 * 2 } else { N as u64 + 5 };
+const N_SLEEP_MILLIS: u64 = if N > 19 { N as u64 * 12 } else if N > 17 { N as u64 * 10 } else if N > 12 { N as u64 * 2 } else { N as u64 + 5 };
 
 pub struct ThreadTask {
 	pub depth: usize,
@@ -364,7 +373,8 @@ fn main() {
 			let start_time = Instant::now();
 			let mut byte_board_arr: [u8; BYTE_BOARD_LEN] = [0; BYTE_BOARD_LEN];
 			let mut byte_board = byte_board_arr.as_mut_ptr();
-			let mut ref_stack_arr: [*mut u8; REF_STACK_LEN] = [std::ptr::null_mut(); REF_STACK_LEN];
+			let ref_stack_placeholder = byte_board.offset(PLACEHOLDER_REF_STACK_OFFSET);
+			let mut ref_stack_arr: [*mut u8; REF_STACK_LEN] = [ref_stack_placeholder; REF_STACK_LEN];
 			let ref_stack = ref_stack_arr.as_mut_ptr();
 			byte_board = byte_board.offset(Z as isize); // seeded with first index of the byte board as the only allowed extension
 			*ref_stack = byte_board;
@@ -689,7 +699,8 @@ fn count_extensions_subset_outer(task: ThreadTask, task_num: usize, overall_star
 		let start_time = Instant::now();
 		let mut byte_board_arr: [u8; BYTE_BOARD_LEN] = task.byte_board;
 		let byte_board = byte_board_arr.as_mut_ptr();
-		let mut ref_stack_arr: [*mut u8; REF_STACK_LEN] = [std::ptr::null_mut(); REF_STACK_LEN];
+		let ref_stack_placeholder = byte_board.offset(PLACEHOLDER_REF_STACK_OFFSET);
+		let mut ref_stack_arr: [*mut u8; REF_STACK_LEN] = [ref_stack_placeholder; REF_STACK_LEN];
 		// restore the ref stack using offsets
 		for i in 0..REF_STACK_LEN {
 			ref_stack_arr[i] = byte_board.offset(task.ref_stack[i]);
@@ -725,15 +736,17 @@ fn copy_ref_stack_as_offsets(byte_board_arr: &[u8; BYTE_BOARD_LEN], ref_stack_ar
 	unsafe {
 		for i in 0..REF_STACK_LEN {
 			// !!!!! !!!!! !!!!! !!!!! !!!!! !!!!! !!!!!
-			// very odd... need to print (or at least format a string) to avoid segfauly
+			// very odd... need to keep the below junk
+			//   instead of just assigning the value, or
+			//   else task hashes end up changed ... this
+			//   doesn't really affect running time, since
+			//   this only runs for the short thread tasks
+			//   initializaion, so may as well leave it
 			// !!!!! !!!!! !!!!! !!!!! !!!!! !!!!! !!!!!
 			let mut o = ref_stack_arr[i].offset_from(byte_board);
-			let _ = format!("offset for ref_stack[{i}]: {o}");
-			// looks like any remaining null pointers end up with non-deterministic
-			//   large negative isize values here, so replace those with some
-			//   constant value to ensure the hashes always come out the same
-			if o < -255 {
-				o = -123456
+			if o < -255 && o != PLACEHOLDER_REF_STACK_OFFSET {
+				println!("have a isize offset for a ref_stack entry (at index {i}) of {o}");
+				o = PLACEHOLDER_REF_STACK_OFFSET;
 			}
 			ref_stack_copy[i] = o;
 		}
