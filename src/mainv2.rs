@@ -84,7 +84,7 @@ const DESCRIPTIONS: [&str; 4] = [
 	"short diagonal order 2 rotation",
 	"long diagonal order 3 rotation"
 ];
-const AUT_CLASS_SIZES: [usize; 4] = [3, 6, 6, 8];
+const AUT_CLASS_SIZES: [u128; 4] = [3, 6, 6, 8];
 const MATRIX_REPS: [[i32; 9]; 4] = [
 	[-1, 0, 0, 0, -1, 0, 0, 0, 1],
 	[0, -1, 0, 1, 0, 0, 0, 0, 1],
@@ -112,7 +112,7 @@ const BIASES: [[i32; 3]; 4] = [
 
 // with the USE_PRECOMPUTED_SYMM constant:
 // lets us optionally use previously-calculated values here
-const NONTRIVIAL_SYMMETRIES_COUNTS: [usize; 23] = [0,
+const NONTRIVIAL_SYMMETRIES_COUNTS: [u128; 23] = [0,
 	/* n=1  */             0,
 	/* n=2  */             0,
 	/* n=3  */             0,
@@ -137,7 +137,7 @@ const NONTRIVIAL_SYMMETRIES_COUNTS: [usize; 23] = [0,
 	/* n=22 */ 3_699_765_374];
 
 // comment these out if wanting to re-calculate
-const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, usize); 10] = [
+const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, u128); 12] = [
 	// N, FILTER_DEPTH, task hash, cumulative free polycubes count
 	(16, 10, 14250364139652756278, 1113840924125),
 	(16, 12, 9317956767031721395, 622727856628),
@@ -150,8 +150,10 @@ const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, usize); 10] = [
 	(22, 13, 4882944094302709, 89552651750264),
 	(22, 13, 7624875869015158, 126084150825247),
 
-	(22, 14, 7391011772847126, 92455770341602),
+	(22, 14,  7391011772847126,  92455770341602),
 	(22, 14, 22599905593694915, 333264506359726),
+	(22, 14, 28707673513263559, 417454867221930),
+	(22, 14, 35618743721413906, 531334413791963),
 ];
 
 // for smaller values of N, we can greatly speed up computation by
@@ -201,7 +203,7 @@ fn print_w_time(start_time: Instant, message: String) {
 }
 
 // thanks to https://stackoverflow.com/a/67834588/259456
-fn integer_with_thousands_separator(num: usize) -> String {
+fn integer_with_thousands_separator(num: u128) -> String {
 	return num.to_string()
 	.as_bytes()
 	.rchunks(3)
@@ -215,7 +217,7 @@ fn integer_with_thousands_separator(num: usize) -> String {
 fn main() {
 	let overall_start_time = Instant::now();
 	let symmetry_time_elapsed: f64;
-	let mut count: usize = 0; // enumerate the sum over the order 24 group of the size of the fix of each group element, and divide by 24 (Burnside's lemma)
+	let mut count: u128 = 0; // enumerate the sum over the order 24 group of the size of the fix of each group element, and divide by 24 (Burnside's lemma)
 
 	/* ====-====-====-====-====-====-====
 	first portion: symmetric polycubes
@@ -228,7 +230,7 @@ fn main() {
 		println!("total count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(symmetry_time_elapsed));
 	} else if THREADS == 1 {
 		for sym in 0..4 {
-			let mut subcount = 0;
+			let mut subcount: u128 = 0;
 			for i in (1 - (N as i32))..(N as i32) {
 				for j in (1 - (N as i32) + i.abs())..=((N as i32) - 1 - i.abs()) {
 					subcount += count_symmetric_polycubes(
@@ -337,17 +339,17 @@ fn main() {
 		let n_sleep = Duration::from_millis(N_SLEEP_MILLIS);
 		println!("N={N}, n_sleep_millis={N_SLEEP_MILLIS}");
 		let sw = Instant::now();
-		let mut subcount: usize = 0;
+		let mut subcount: u128 = 0;
 		let total_tasks: usize;
 
 		// using a BTreeMap so we can pop tasks off the front, in order by hash
 		let mut tasks: BTreeMap<u64, ThreadTask>;
 		let ordered_task_hashes: Vec<u64>;
 
-		let mut completed_task_counts: BTreeMap<u64, usize> = BTreeMap::new();
+		let mut completed_task_counts: BTreeMap<u64, u128> = BTreeMap::new();
 		let mut last_checkpoint_task_hash: Option<u64> = None;
 		let mut last_checkpoint_time = Instant::now();
-		let mut last_checkpoint_total: usize = 0;
+		let mut last_checkpoint_total: u128 = 0;
 		let mut completed_tasks: usize = 0;
 
 		// find the highest available checkpoint for N+FILTER_DEPTH, if any
@@ -390,7 +392,7 @@ fn main() {
 	
 			// a vec of stacks, and offsets for stack_top_1
 			// for each entry in the vec, with a separate thread, run count_extensions_subset_final
-			let count_and_tasks: (usize, BTreeMap<u64, ThreadTask>) =
+			let count_and_tasks: (u128, BTreeMap<u64, ThreadTask>) =
 				count_extensions_subset_inner(N as usize, ref_stack.add(1), ref_stack.add((N - 2) * 4 as usize), ref_stack, &byte_board_arr, &ref_stack_arr);
 	
 			if last_checkpoint_task_hash.is_some() {
@@ -536,7 +538,7 @@ fn main() {
 	println!("overall time: {}", seconds_to_dur(overall_start_time.elapsed().as_secs_f64()));
 }
 
-fn count_symmetric_polycubes_task(i: i32, j: i32, sym: usize) -> usize {
+fn count_symmetric_polycubes_task(i: i32, j: i32, sym: usize) -> u128 {
 	return count_symmetric_polycubes(
 		&MATRIX_REPS[sym],
 		[
@@ -546,7 +548,7 @@ fn count_symmetric_polycubes_task(i: i32, j: i32, sym: usize) -> usize {
 		]);
 }
 
-fn count_symmetric_polycubes(linear_map: &[i32; 9], affine_shift: [i32; 3]) -> usize {
+fn count_symmetric_polycubes(linear_map: &[i32; 9], affine_shift: [i32; 3]) -> u128 {
 	let mut adjacency_counts = vec![vec![vec![0u8; (N + 2) as usize]; (2 * N + 1) as usize]; (2 * N + 1) as usize];
 	'zloop: for z in 0..2 {
 		for y in 0..(2 * N + 1) {
@@ -572,7 +574,7 @@ fn count_extensions(
 		extension_stack: &mut Vec<(i32, i32, i32)>,
 		recovery_stack: &mut Vec<(i32, i32, i32)>,
 		linear_map: &[i32; 9],
-		affine_shift: [i32; 3]) -> usize {
+		affine_shift: [i32; 3]) -> u128 {
 	cells_to_add -= 1;
 	let mut count = 0;
 	let original_length = extension_stack.len();
@@ -694,7 +696,7 @@ fn count_extensions(
 
 
 // rebuild state from ThreadTask, then continue execution with count_extensions_subset_inner()
-fn count_extensions_subset_outer(task: ThreadTask, task_num: usize, overall_start_time: Instant) -> (usize, u64) {
+fn count_extensions_subset_outer(task: ThreadTask, task_num: usize, overall_start_time: Instant) -> (u128, u64) {
 	unsafe {
 		let start_time = Instant::now();
 		let mut byte_board_arr: [u8; BYTE_BOARD_LEN] = task.byte_board;
@@ -715,7 +717,7 @@ fn count_extensions_subset_outer(task: ThreadTask, task_num: usize, overall_star
 			print_w_time(overall_start_time, format!("started  count_extensions_subset_outer() with task_number={}, N={N}, FILTER_DEPTH={FILTER_DEPTH}", task_num));
 		}
 
-		let count_and_tasks: (usize, BTreeMap<u64, ThreadTask>) =
+		let count_and_tasks: (u128, BTreeMap<u64, ThreadTask>) =
 			count_extensions_subset_inner(depth, stack_top_inner, stack_top_2, ref_stack, &byte_board_arr, &ref_stack_arr);
 
 		if SHOW_ALL_TASK_RESULTS {
@@ -760,9 +762,9 @@ fn count_extensions_subset_inner(
 		mut stack_top_2: *mut *mut u8,
 		ref_stack: *mut *mut u8,
 		byte_board_arr: &[u8; BYTE_BOARD_LEN],
-		ref_stack_arr: &[*mut u8; REF_STACK_LEN]) -> (usize, BTreeMap<u64, ThreadTask>) {
+		ref_stack_arr: &[*mut u8; REF_STACK_LEN]) -> (u128, BTreeMap<u64, ThreadTask>) {
 	unsafe {
-		let mut count: usize = 0;
+		let mut count: u128 = 0;
 		let mut tasks: BTreeMap<u64, ThreadTask> = BTreeMap::new();
 		let stack_top_original = stack_top_1;
 		while stack_top_1 != ref_stack {
@@ -845,26 +847,26 @@ fn count_extensions_subset_inner(
 	}
 }
 
-fn count_extensions_subset_final(mut stack_top: *mut *mut u8, ref_stack: *mut *mut u8) -> usize {
+fn count_extensions_subset_final(mut stack_top: *mut *mut u8, ref_stack: *mut *mut u8) -> u128 {
 	unsafe {
-		let length = stack_top.offset_from(ref_stack);
-		let mut count: isize = (length * (length - 1) * (length - 2) / 6).try_into().unwrap();
+		let length = stack_top.offset_from(ref_stack) as i128;
+		let mut count: i128 = (length * (length - 1) * (length - 2) / 6).try_into().unwrap();
 		let mut stack_top_temp = stack_top;
 		while stack_top_temp != ref_stack {
 			stack_top_temp = stack_top_temp.sub(1);
 			let i = *stack_top_temp;
-			let mut neighbours = 0;
+			let mut neighbours: i128 = 0;
 			let mut subcount: usize = 128;
 
-			let incr = i.sub(X as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(X2) as usize + *i.sub(SYX) as usize + *i.sub(SZX) as usize + *i.add(DYX) as usize + *i.add(DZX) as usize; *incr -= 1; count += *incr as isize; }
-			let incr = i.sub(Y as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(Y2) as usize + *i.sub(SYX) as usize + *i.sub(SZY) as usize + *i.sub(DYX) as usize + *i.add(DZY) as usize; *incr -= 1; count += *incr as isize; }
-			let incr = i.sub(Z as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(Z2) as usize + *i.sub(SZX) as usize + *i.sub(SZY) as usize + *i.sub(DZX) as usize + *i.sub(DZY) as usize; *incr -= 1; count += *incr as isize; }
-			let incr = i.add(X as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(X2) as usize + *i.add(SYX) as usize + *i.add(SZX) as usize + *i.sub(DYX) as usize + *i.sub(DZX) as usize; *incr -= 1; count += *incr as isize; }
-			let incr = i.add(Y as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(Y2) as usize + *i.add(SYX) as usize + *i.add(SZY) as usize + *i.add(DYX) as usize + *i.sub(DZY) as usize; *incr -= 1; count += *incr as isize; }
-			let incr = i.add(Z as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(Z2) as usize + *i.add(SZX) as usize + *i.add(SZY) as usize + *i.add(DZX) as usize + *i.add(DZY) as usize; *incr -= 1; count += *incr as isize; }
+			let incr = i.sub(X as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(X2) as usize + *i.sub(SYX) as usize + *i.sub(SZX) as usize + *i.add(DYX) as usize + *i.add(DZX) as usize; *incr -= 1; count += *incr as i128; }
+			let incr = i.sub(Y as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(Y2) as usize + *i.sub(SYX) as usize + *i.sub(SZY) as usize + *i.sub(DYX) as usize + *i.add(DZY) as usize; *incr -= 1; count += *incr as i128; }
+			let incr = i.sub(Z as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(Z2) as usize + *i.sub(SZX) as usize + *i.sub(SZY) as usize + *i.sub(DZX) as usize + *i.sub(DZY) as usize; *incr -= 1; count += *incr as i128; }
+			let incr = i.add(X as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(X2) as usize + *i.add(SYX) as usize + *i.add(SZX) as usize + *i.sub(DYX) as usize + *i.sub(DZX) as usize; *incr -= 1; count += *incr as i128; }
+			let incr = i.add(Y as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(Y2) as usize + *i.add(SYX) as usize + *i.add(SZY) as usize + *i.add(DYX) as usize + *i.sub(DZY) as usize; *incr -= 1; count += *incr as i128; }
+			let incr = i.add(Z as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(Z2) as usize + *i.add(SZX) as usize + *i.add(SZY) as usize + *i.add(DZX) as usize + *i.add(DZY) as usize; *incr -= 1; count += *incr as i128; }
 
 			// some of these values are sometimes negative
-			count += ((subcount >> 8) as isize) + ((neighbours * (neighbours + (length << 1) - 511)) >> 1);
+			count += ((subcount >> 8) as i128) + ((neighbours * (neighbours + (length << 1) - 511)) >> 1);
 		}
 		while stack_top != ref_stack {
 			stack_top = stack_top.sub(1);
@@ -876,6 +878,6 @@ fn count_extensions_subset_final(mut stack_top: *mut *mut u8, ref_stack: *mut *m
 			let incr = i.add(Y as usize); *incr |= *incr >> 4;
 			let incr = i.add(Z as usize); *incr |= *incr >> 4;
 		}
-		return count as usize;
+		return count as u128;
 	}
 }
