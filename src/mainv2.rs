@@ -136,9 +136,9 @@ const NONTRIVIAL_SYMMETRIES_COUNTS: [u128; 23] = [0,
 	/* n=21 */ 1_055_564_170,
 	/* n=22 */ 3_699_765_374];
 
-// comment these out if wanting to re-calculate
-const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, u128); 12] = [
-	// N, FILTER_DEPTH, task hash, cumulative free polycubes count
+// comment these out if wanting to re-calculate with the same N and FILTER_DEPTH
+const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, u128); 13] = [
+	// N, FILTER_DEPTH, task hash, cumulative fixed polycubes count
 	(16, 10, 14250364139652756278, 1113840924125),
 	(16, 12, 9317956767031721395, 622727856628),
 	(16, 12, 15320539189854766585, 1039500728908),
@@ -150,10 +150,11 @@ const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, u128); 12] = [
 	(22, 13, 4882944094302709, 89552651750264),
 	(22, 13, 7624875869015158, 126084150825247),
 
-	(22, 14,  7391011772847126,  92455770341602),
-	(22, 14, 22599905593694915, 333264506359726),
-	(22, 14, 28707673513263559, 417454867221930),
-	(22, 14, 35618743721413906, 531334413791963),
+	(22, 14,   7391011772847126,   92455770341602),
+	(22, 14,  22599905593694915,  333264506359726),
+	(22, 14,  28707673513263559,  417454867221930),
+	(22, 14,  35618743721413906,  531334413791963),
+	(22, 14, 172126854280677014, 2861223911533484), // (0.92%)
 ];
 
 // for smaller values of N, we can greatly speed up computation by
@@ -250,7 +251,7 @@ fn main() {
 		println!("total count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(symmetry_time_elapsed));
 	} else {
 		let n_sleep = Duration::from_millis(N_SLEEP_MILLIS);
-		println!("N={N}, n_sleep_millis={N_SLEEP_MILLIS}");
+		println!("THREADS={THREADS}, N={N}, n_sleep_millis={N_SLEEP_MILLIS}");
 		// run a batch of worker tasks for each of the 4 symmetries
 		for sym in 0..4 {
 			print_w_time(overall_start_time, format!("Counting {} symmetries (set {} of 4):", DESCRIPTIONS[sym], sym+1));
@@ -335,9 +336,9 @@ fn main() {
 	main/second portion: fixed polycubes (https://oeis.org/A001931)
 	====-====-====-====-====-====-====-====-====-====-====-====-====-==== */
 	{
-		print_w_time(overall_start_time, format!("\nCounting polycubes via extensions..."));
+		print_w_time(overall_start_time, "Counting polycubes via extensions...".to_string());
 		let n_sleep = Duration::from_millis(N_SLEEP_MILLIS);
-		println!("N={N}, n_sleep_millis={N_SLEEP_MILLIS}");
+		println!("THREADS={THREADS}, N={N}, n_sleep_millis={N_SLEEP_MILLIS}");
 		let sw = Instant::now();
 		let mut subcount: u128 = 0;
 		let total_tasks: usize;
@@ -365,12 +366,11 @@ fn main() {
 			}
 		}
 
-		// for debug
 		if last_checkpoint_task_hash.is_some() {
 			println!("using highest matching checkpoint hash {} with count {}", last_checkpoint_task_hash.unwrap(), last_checkpoint_total);
 		}
 
-		// initialize the Vec of thread tasks
+		// initialize the BTreeMap of hash-ordered thread tasks
 		unsafe {
 			let start_time = Instant::now();
 			let mut byte_board_arr: [u8; BYTE_BOARD_LEN] = [0; BYTE_BOARD_LEN];
@@ -510,10 +510,7 @@ fn main() {
 						last_checkpoint_total = new_checkpoint_total;
 						let new_checkpoint_nth_task: usize = ordered_task_hashes.binary_search(&last_checkpoint_task_hash.unwrap()).unwrap() + 1;
 						let new_checkpoint_pct = (new_checkpoint_nth_task as f32 * 100.0) / (total_tasks as f32);
-						print_w_time(overall_start_time, format!("N={N}, FILTER_DEPTH={FILTER_DEPTH} checkpoint at task [{}], {new_checkpoint_nth_task} of {total_tasks} ({:.2}%), cumulative free polycubes count={new_checkpoint_total}", last_checkpoint_task_hash.unwrap(), new_checkpoint_pct));
-						//if !SHOW_ALL_TASK_RESULTS {
-						//	print_w_time(overall_start_time, format!("tasks remaining: [{total_tasks}-{completed_tasks}={}]", total_tasks-completed_tasks));
-						//}
+						print_w_time(overall_start_time, format!("N={N}, FILTER_DEPTH={FILTER_DEPTH} checkpoint at task [{}], {new_checkpoint_nth_task} of {total_tasks} ({:.2}%), cumulative fixed polycubes count={new_checkpoint_total}", last_checkpoint_task_hash.unwrap(), new_checkpoint_pct));
 					}
 				}
 			}

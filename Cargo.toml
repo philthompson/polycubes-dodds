@@ -12,6 +12,10 @@ path = "src/mainv1.rs"
 name = "polycubes-v2"
 path = "src/mainv2.rs"
 
+[[bin]]
+name = "polycubes-a001931"
+path = "src/mainv2-A001931.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

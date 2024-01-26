@@ -1,0 +1,519 @@
+/*
+
+this program computes values for https://oeis.org/A001931
+
+it is an excerpt (the 2nd portion) of the main program
+  that computes the values for https://oeis.org/A000162
+  (except for trivially small values of N)
+
+this is based on a rust port of Stanley Dodds's algorithm,
+  whose original C# code is available at:
+  https://oeis.org/A000162/a000162.cs.txt
+  and:
+  https://oeis.org/A001931/a001931.cs.txt
+
+rust port by Phil Thompson in January 2024, along with changes:
+- allow the work to be divided into many more thread tasks by changing FILTER_TASK relative to N
+- allow use of previously-computed counts at "checkpoints" (to resume a long-running computation)
+- allow specifying more threads than worker tasks
+- print timestamps (elapsed time) for most messages
+
+-----
+
+change FILTER_DEPTH to control to how many thread tasks we create:
+
+tasks for FILTER_DEPTH=5:
+N = 11 -> 23502
+N = 12 -> 162913
+N = 13 -> 1152870
+
+tasks for FILTER_DEPTH=7:
+N = 11 -> 534
+N = 12 -> 3481
+N = 13 -> 23502
+
+*/
+
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::time::Duration;
+use std::time::Instant;
+use std::thread;
+use std::collections::BTreeMap;
+// this import needed depending on rust toolchain? or edition? (e.g. on Amazon Linux)
+//use std::convert::TryInto;
+
+const N: usize = 15; // number of polycube cells
+const FILTER_DEPTH: usize = 11; // keep smaller than N to use multiple threads (lower=more shorter thread tasks)
+const THREADS: usize = 8;
+
+// output checkpoint count+finished tasks info no more often than this many seconds
+const CHECKPOINT_SECONDS: f32 = 5.0;
+
+const PLACEHOLDER_REF_STACK_OFFSET: isize = -123456; // if this is changed, the task hashes will change and any previous checkpoints will no longer work
+
+// if false, only checkpoints will be printed to stdout
+const SHOW_ALL_TASK_RESULTS: bool = false;
+
+const X: i32 = (N as i32 + 5) / 4 * ((N as i32 + 5) / 4 * 3 - 2); // set X<Y<Z such that aX+bY+cZ = 0 implies a = b = c = 0 or |a|+|b|+|c| > n
+const Y: i32 = X + 1; // trivial choice is X = 1, Y = n, Z = n * n. A simple reduction is X = 1, Y = n, Z = n * (n / 2) + (n + 1) / 2
+const Z: i32 = X + (N as i32 + 5) / 4 * 3; // minimising Z is memory efficient. Unclear if this noticably affects performance. Z ~ 3/16 n^2 is the best I can find for arbitrary n
+
+const X2: usize = (X + X) as usize;
+const Y2: usize = (Y + Y) as usize;
+const Z2: usize = (Z + Z) as usize;
+const SYX: usize = (Y + X) as usize;
+const SZX: usize = (Z + X) as usize;
+const SZY: usize = (Z + Y) as usize;
+const DYX: usize = (Y - X) as usize;
+const DZX: usize = (Z - X) as usize;
+const DZY: usize = (Z - Y) as usize;
+
+const BYTE_BOARD_LEN: usize = (N + 2) * (Z as usize);
+const REF_STACK_LEN: usize = (N - 2) * 4;
+
+// comment these out if wanting to re-calculate with the same N and FILTER_DEPTH
+const FIXED_PORTION_CHECKPOINTS: [(usize, usize, u64, u128); 5] = [
+	// N, FILTER_DEPTH, task hash, cumulative fixed polycubes count
+	(16, 12,  9317956767031721395,  622727856628),
+	(16, 12, 15320539189854766585, 1039500728908),
+	(16, 12, 16863857699850425004, 1233957548477), // (92.13%)
+	(17, 12, 10306999600203458141, 6036447860508),
+	(17, 12, 14726552232942904259, 8794072714458), // (79.23%)
+];
+
+// for smaller values of N, we can greatly speed up computation by
+//   lowering the sleep time used when waiting for threads to finish
+// for larger values of N, we can check less often and waste fewer
+//   cycles in the main thread
+const N_SLEEP_MILLIS: u64 = if N > 19 { N as u64 * 12 } else if N > 17 { N as u64 * 10 } else if N > 12 { N as u64 * 2 } else { N as u64 + 5 };
+
+pub struct ThreadTask {
+	pub depth: usize,
+	pub stack_top_inner_offset: isize,
+	pub stack_top_2_offset: isize,
+	pub ref_stack_offset: isize,
+	pub byte_board: [u8; BYTE_BOARD_LEN],
+	// can't actually store the pointers here, instead, need to
+	//   store offsets (isize) to re-create this
+	pub ref_stack: [isize; REF_STACK_LEN]
+}
+
+impl Hash for ThreadTask {
+	fn hash<H: Hasher>(&self, hasher: &mut H) {
+		self.depth.hash(hasher);
+		self.stack_top_inner_offset.hash(hasher);
+		self.stack_top_2_offset.hash(hasher);
+		self.ref_stack_offset.hash(hasher);
+		self.byte_board.hash(hasher);
+		self.ref_stack.hash(hasher);
+	}
+}
+
+fn get_task_hash(thread_task: &ThreadTask) -> u64 {
+	let mut hasher = DefaultHasher::new();
+	thread_task.hash(&mut hasher);
+	return hasher.finish();
+}
+
+fn seconds_to_dur(s: f64) -> String {
+	let days = (s / 86400.0).floor();
+	let hours = ((s - (days * 86400.0)) / 3600.0).floor();
+	let minutes = ((s - (days * 86400.0) - (hours * 3600.0)) / 60.0).floor();
+	let seconds = s - (days * 86400.0) - (hours * 3600.0) - (minutes * 60.0);
+	return format!("{:0>3}d:{:0>2}h:{:0>2}m:{:0>6.3}s", days, hours, minutes, seconds);
+}
+
+fn print_w_time(start_time: Instant, message: String) {
+	println!("[{}] {message}", seconds_to_dur(start_time.elapsed().as_secs_f64()));
+}
+
+// thanks to https://stackoverflow.com/a/67834588/259456
+fn integer_with_thousands_separator(num: u128) -> String {
+	return num.to_string()
+	.as_bytes()
+	.rchunks(3)
+	.rev()
+	.map(std::str::from_utf8)
+	.collect::<Result<Vec<&str>, _>>()
+	.unwrap()
+	.join(",");
+}
+
+fn main() {
+	let overall_start_time = Instant::now();
+
+	print_w_time(overall_start_time, "Counting fixed polycubes via extensions...".to_string());
+	let n_sleep = Duration::from_millis(N_SLEEP_MILLIS);
+	println!("THREADS={THREADS}, N={N}, n_sleep_millis={N_SLEEP_MILLIS}");
+	let sw = Instant::now();
+	let mut subcount: u128 = 0;
+	let total_tasks: usize;
+
+	// using a BTreeMap so we can pop tasks off the front, in order by hash
+	let mut tasks: BTreeMap<u64, ThreadTask>;
+	let ordered_task_hashes: Vec<u64>;
+
+	let mut completed_task_counts: BTreeMap<u64, u128> = BTreeMap::new();
+	let mut last_checkpoint_task_hash: Option<u64> = None;
+	let mut last_checkpoint_time = Instant::now();
+	let mut last_checkpoint_total: u128 = 0;
+	let mut completed_tasks: usize = 0;
+
+	// find the highest available checkpoint for N+FILTER_DEPTH, if any
+	for checkpoint in FIXED_PORTION_CHECKPOINTS {
+		if checkpoint.0 != N || checkpoint.1 != FILTER_DEPTH {
+			continue;
+		}
+		completed_task_counts.insert(checkpoint.2, checkpoint.3);
+		if last_checkpoint_task_hash.is_none() || checkpoint.2 > last_checkpoint_task_hash.unwrap() {
+			last_checkpoint_task_hash = Some(checkpoint.2);
+			last_checkpoint_total = checkpoint.3;
+			subcount = last_checkpoint_total;
+		}
+	}
+
+	if last_checkpoint_task_hash.is_some() {
+		println!("using highest matching checkpoint hash {} with count {}", last_checkpoint_task_hash.unwrap(), last_checkpoint_total);
+	}
+
+	// initialize the BTreeMap of hash-ordered thread tasks
+	unsafe {
+		let start_time = Instant::now();
+		let mut byte_board_arr: [u8; BYTE_BOARD_LEN] = [0; BYTE_BOARD_LEN];
+		let mut byte_board = byte_board_arr.as_mut_ptr();
+		let ref_stack_placeholder = byte_board.offset(PLACEHOLDER_REF_STACK_OFFSET);
+		let mut ref_stack_arr: [*mut u8; REF_STACK_LEN] = [ref_stack_placeholder; REF_STACK_LEN];
+		let ref_stack = ref_stack_arr.as_mut_ptr();
+		byte_board = byte_board.offset(Z as isize); // seeded with first index of the byte board as the only allowed extension
+		*ref_stack = byte_board;
+		let mut i = byte_board.offset((N as isize + 1) * Z as isize);
+		i = i.sub(1);
+		// the first Z + 1 bytes are disallowed extensions; first Z are less than the minimum, last 1 due to edge case of initial polycube having no neighbours
+		while i != byte_board {
+			*i = 255;
+			i = i.sub(1);
+		}
+
+		print_w_time(overall_start_time, format!("started  initializing tasks, N={N}, FILTER_DEPTH={FILTER_DEPTH}"));
+
+		// a vec of stacks, and offsets for stack_top_1
+		// for each entry in the vec, with a separate thread, run count_extensions_subset_final
+		let count_and_tasks: (u128, BTreeMap<u64, ThreadTask>) =
+			count_extensions_subset_inner(N as usize, ref_stack.add(1), ref_stack.add((N - 2) * 4 as usize), ref_stack, &byte_board_arr, &ref_stack_arr);
+
+		if last_checkpoint_task_hash.is_some() {
+			if count_and_tasks.0 > 0 {
+				println!("??? the initialization itself returns a count ???");
+			}
+		} else {
+			subcount += count_and_tasks.0;
+		}
+		tasks = count_and_tasks.1;
+		total_tasks = tasks.len();
+		// create a copy of all task hashes, in order
+		ordered_task_hashes = tasks.keys().cloned().collect();
+
+		let time_elapsed = start_time.elapsed().as_secs_f64();
+		print_w_time(overall_start_time, format!("finished initializing {} tasks, N={N}, FILTER_DEPTH={FILTER_DEPTH}, took {}", tasks.len(), seconds_to_dur(time_elapsed)));
+
+		// remove completed tasks until we find the checkpoint
+		match last_checkpoint_task_hash {
+			Some(checkpoint_hash) => {
+				if !tasks.contains_key(&checkpoint_hash) {
+					println!("the checkpoint hash {checkpoint_hash} is not found among the tasks");
+					last_checkpoint_task_hash = None;
+					last_checkpoint_total = 0;
+					subcount = 0;
+				} else {
+					loop {
+						let popped = tasks.pop_first();
+						if popped.is_none() {
+							break;
+						}
+						completed_tasks += 1;
+						if popped.unwrap().0 == checkpoint_hash {
+							break;
+						}
+					}
+					println!("found {completed_tasks} completed tasks including the checkpoint");
+				}
+			}
+			None => {}
+		}
+	}
+
+	let mut thread_handles = Vec::new();
+
+	// spawn the desired number of threads
+	while thread_handles.len() < THREADS {
+		let task = tasks.pop_first();
+		if task.is_none() {
+			break;
+		}
+		let (_task_hash, task) = task.unwrap();
+		let handle = thread::spawn(move || count_extensions_subset_outer(task, completed_tasks, overall_start_time));
+		thread_handles.push(handle);
+	}
+	let mut handle_index_to_replace: Option<usize> = None;
+
+	// replace completed threads with new ones until there are none left
+	while completed_tasks < total_tasks {
+		let mut j: usize = 0;
+		while j < thread_handles.len() {
+			if thread_handles[j].is_finished() {
+				handle_index_to_replace = Some(j);
+				break;
+			}
+			j += 1;
+		}
+		if handle_index_to_replace.is_none() {
+			thread::sleep(n_sleep);
+			continue;
+		}
+		let (task_count, task_hash) = thread_handles.remove(handle_index_to_replace.take().unwrap()).join().unwrap();
+		completed_task_counts.insert(task_hash, task_count);
+		subcount += task_count;
+		completed_tasks += 1;
+		if SHOW_ALL_TASK_RESULTS {
+			print_w_time(overall_start_time, format!("tasks remaining: [{total_tasks}-{completed_tasks}={}]", total_tasks-completed_tasks));
+		}
+
+		// if enough time has passed, see if we can print a new checkpoint
+		if completed_tasks > 0 && last_checkpoint_time.elapsed().as_secs_f32() > CHECKPOINT_SECONDS {
+			last_checkpoint_time = Instant::now();
+			let mut new_checkpoint_task_hash: Option<u64> = None;
+			let mut new_checkpoint_total = last_checkpoint_total;
+
+			// if there was no previous checkpoint, we need to start at the 0th task
+			let mut slice_lower: usize = 0;
+			// if there was a previous checkpoint, start checking at the next task after that
+			if last_checkpoint_task_hash.is_some() {
+				match ordered_task_hashes.binary_search(&last_checkpoint_task_hash.unwrap()) {
+					Ok(hash_index) => {
+						slice_lower = hash_index + 1
+					}
+					Err(_) => { println!("somehow the last_checkpoint_task_hash was not found"); }
+				}
+			}
+			// walk through all tasks to find where the next incomplete one is
+			for ordered_task_hash in &ordered_task_hashes[slice_lower .. ordered_task_hashes.len()] {
+				match completed_task_counts.get(&ordered_task_hash) {
+					Some(count) => {
+						new_checkpoint_task_hash = Some(*ordered_task_hash);
+						new_checkpoint_total += count;
+					}
+					None => {
+						break;
+					}
+				}
+			}
+
+			if new_checkpoint_task_hash.is_some() {
+				if last_checkpoint_task_hash.is_none() || new_checkpoint_task_hash.unwrap() > last_checkpoint_task_hash.unwrap() {
+					last_checkpoint_task_hash = new_checkpoint_task_hash;
+					last_checkpoint_total = new_checkpoint_total;
+					let new_checkpoint_nth_task: usize = ordered_task_hashes.binary_search(&last_checkpoint_task_hash.unwrap()).unwrap() + 1;
+					let new_checkpoint_pct = (new_checkpoint_nth_task as f32 * 100.0) / (total_tasks as f32);
+					print_w_time(overall_start_time, format!("N={N}, FILTER_DEPTH={FILTER_DEPTH} checkpoint at task [{}], {new_checkpoint_nth_task} of {total_tasks} ({:.2}%), cumulative fixed polycubes count={new_checkpoint_total}", last_checkpoint_task_hash.unwrap(), new_checkpoint_pct));
+				}
+			}
+		}
+
+		loop {
+			let task = tasks.pop_first();
+			if task.is_none() {
+				break;
+			}
+			let (_task_hash, task) = task.unwrap();
+			let handle = thread::spawn(move || count_extensions_subset_outer(task, completed_tasks, overall_start_time));
+			thread_handles.push(handle);
+			break;
+		}
+	}
+	println!("\n\n{:} polycubes with {} cells (number of polycubes fixed by trivial symmetry)\nTook {}", integer_with_thousands_separator(subcount), N, seconds_to_dur(sw.elapsed().as_secs_f64()));
+}
+
+// rebuild state from ThreadTask, then continue execution with count_extensions_subset_inner()
+fn count_extensions_subset_outer(task: ThreadTask, task_num: usize, overall_start_time: Instant) -> (u128, u64) {
+	unsafe {
+		let start_time = Instant::now();
+		let mut byte_board_arr: [u8; BYTE_BOARD_LEN] = task.byte_board;
+		let byte_board = byte_board_arr.as_mut_ptr();
+		let ref_stack_placeholder = byte_board.offset(PLACEHOLDER_REF_STACK_OFFSET);
+		let mut ref_stack_arr: [*mut u8; REF_STACK_LEN] = [ref_stack_placeholder; REF_STACK_LEN];
+		// restore the ref stack using offsets
+		for i in 0..REF_STACK_LEN {
+			ref_stack_arr[i] = byte_board.offset(task.ref_stack[i]);
+		}
+
+		let depth = task.depth;
+		let ref_stack = ref_stack_arr.as_mut_ptr().offset(task.ref_stack_offset);
+		let stack_top_inner = ref_stack.offset(task.stack_top_inner_offset);
+		let stack_top_2 = ref_stack.offset(task.stack_top_2_offset);
+
+		if SHOW_ALL_TASK_RESULTS {
+			print_w_time(overall_start_time, format!("started  count_extensions_subset_outer() with task_number={}, N={N}, FILTER_DEPTH={FILTER_DEPTH}", task_num));
+		}
+
+		let count_and_tasks: (u128, BTreeMap<u64, ThreadTask>) =
+			count_extensions_subset_inner(depth, stack_top_inner, stack_top_2, ref_stack, &byte_board_arr, &ref_stack_arr);
+
+		if SHOW_ALL_TASK_RESULTS {
+			let time_elapsed = start_time.elapsed().as_secs_f64();
+			print_w_time(overall_start_time, format!("finished count_extensions_subset_outer() with task_number={}, N={N}, FILTER_DEPTH={FILTER_DEPTH}, took {} with count={}", task_num, seconds_to_dur(time_elapsed), count_and_tasks.0));
+		}
+
+		return (count_and_tasks.0, get_task_hash(&task));
+	}
+}
+
+fn copy_ref_stack_as_offsets(byte_board_arr: &[u8; BYTE_BOARD_LEN], ref_stack_arr: &[*mut u8; REF_STACK_LEN]) -> [isize; REF_STACK_LEN] {
+	let mut ref_stack_copy: [isize; REF_STACK_LEN] = [0; REF_STACK_LEN];
+	let byte_board = (*byte_board_arr).as_ptr();
+	unsafe {
+		for i in 0..REF_STACK_LEN {
+			// !!!!! !!!!! !!!!! !!!!! !!!!! !!!!! !!!!!
+			// very odd... need to keep the below junk
+			//   instead of just assigning the value, or
+			//   else task hashes end up changed ... this
+			//   doesn't really affect running time, since
+			//   this only runs for the short thread tasks
+			//   initializaion, so may as well leave it
+			// !!!!! !!!!! !!!!! !!!!! !!!!! !!!!! !!!!!
+			let mut o = ref_stack_arr[i].offset_from(byte_board);
+			if o < -255 && o != PLACEHOLDER_REF_STACK_OFFSET {
+				println!("have a isize offset for a ref_stack entry (at index {i}) of {o}");
+				o = PLACEHOLDER_REF_STACK_OFFSET;
+			}
+			ref_stack_copy[i] = o;
+		}
+	}
+	return ref_stack_copy;
+}
+
+fn count_extensions_subset_inner(
+		depth: usize,
+		mut stack_top_1: *mut *mut u8,
+		mut stack_top_2: *mut *mut u8,
+		ref_stack: *mut *mut u8,
+		byte_board_arr: &[u8; BYTE_BOARD_LEN],
+		ref_stack_arr: &[*mut u8; REF_STACK_LEN]) -> (u128, BTreeMap<u64, ThreadTask>) {
+	unsafe {
+		let mut count: u128 = 0;
+		let mut tasks: BTreeMap<u64, ThreadTask> = BTreeMap::new();
+		let stack_top_original = stack_top_1;
+		while stack_top_1 != ref_stack {
+			stack_top_1 = stack_top_1.sub(1);
+			let index = *stack_top_1;
+			let mut stack_top_inner = stack_top_1;
+
+			let incr = index.sub(X as usize);
+			*incr = (*incr).wrapping_add(1); // thanks to https://stackoverflow.com/a/70776258/259456
+			if *incr == 0 {
+				*stack_top_inner = index.sub(X as usize);
+				stack_top_inner = stack_top_inner.add(1);
+			}
+			let incr = index.sub(Y as usize);
+			*incr = (*incr).wrapping_add(1);
+			if *incr == 0 {
+				*stack_top_inner = index.sub(Y as usize);
+				stack_top_inner = stack_top_inner.add(1);
+			}
+			let incr = index.sub(Z as usize);
+			*incr = (*incr).wrapping_add(1);
+			if *incr == 0 {
+				*stack_top_inner = index.sub(Z as usize);
+				stack_top_inner = stack_top_inner.add(1);
+			}
+			let incr = index.add(X as usize);
+			*incr = (*incr).wrapping_add(1);
+			if *incr == 0 {
+				*stack_top_inner = index.add(X as usize);
+				stack_top_inner = stack_top_inner.add(1);
+			}
+			let incr = index.add(Y as usize);
+			*incr = (*incr).wrapping_add(1);
+			if *incr == 0 {
+				*stack_top_inner = index.add(Y as usize);
+				stack_top_inner = stack_top_inner.add(1);
+			}
+			let incr = index.add(Z as usize);
+			*incr = (*incr).wrapping_add(1);
+			if *incr == 0 {
+				*stack_top_inner = index.add(Z as usize);
+				stack_top_inner = stack_top_inner.add(1);
+			}
+
+			if depth == 4 {
+				count += count_extensions_subset_final(stack_top_inner, ref_stack);
+
+			} else if depth != FILTER_DEPTH {
+				let mut deeper = count_extensions_subset_inner(depth - 1, stack_top_inner, stack_top_2, ref_stack, byte_board_arr, ref_stack_arr);
+				count += deeper.0;
+				tasks.append(&mut deeper.1);
+			
+			// at depth == FILTER_DEPTH, create a copy of the state to be later resumed by a thread
+			} else {
+				let task = ThreadTask {
+					depth: depth - 1,
+					stack_top_inner_offset: stack_top_inner.offset_from(ref_stack),
+					stack_top_2_offset: stack_top_2.offset_from(ref_stack),
+					ref_stack_offset: ref_stack.offset_from(ref_stack_arr.as_ptr()),
+					byte_board: byte_board_arr.clone(),
+					ref_stack: copy_ref_stack_as_offsets(byte_board_arr, ref_stack_arr)
+				};
+				tasks.insert(get_task_hash(&task), task);
+			}
+			*index.sub(X as usize) = (*index.sub(X as usize)).wrapping_sub(1);
+			*index.sub(Y as usize) = (*index.sub(Y as usize)).wrapping_sub(1);
+			*index.sub(Z as usize) = (*index.sub(Z as usize)).wrapping_sub(1);
+			*index.add(X as usize) = (*index.add(X as usize)).wrapping_sub(1);
+			*index.add(Y as usize) = (*index.add(Y as usize)).wrapping_sub(1);
+			*index.add(Z as usize) = (*index.add(Z as usize)).wrapping_sub(1);
+			stack_top_2 = stack_top_2.sub(1);
+			*stack_top_2 = index; // doing this push before the recursion would add one extra unnecessary element to the stack at each level of recursion
+		}
+		while stack_top_1 != stack_top_original {
+			*stack_top_1 = *stack_top_2;
+			stack_top_1 = stack_top_1.add(1);
+			stack_top_2 = stack_top_2.add(1);
+		}
+		return (count, tasks);
+	}
+}
+
+fn count_extensions_subset_final(mut stack_top: *mut *mut u8, ref_stack: *mut *mut u8) -> u128 {
+	unsafe {
+		let length = stack_top.offset_from(ref_stack) as i128;
+		let mut count: i128 = (length * (length - 1) * (length - 2) / 6).try_into().unwrap();
+		let mut stack_top_temp = stack_top;
+		while stack_top_temp != ref_stack {
+			stack_top_temp = stack_top_temp.sub(1);
+			let i = *stack_top_temp;
+			let mut neighbours: i128 = 0;
+			let mut subcount: usize = 128;
+
+			let incr = i.sub(X as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(X2) as usize + *i.sub(SYX) as usize + *i.sub(SZX) as usize + *i.add(DYX) as usize + *i.add(DZX) as usize; *incr -= 1; count += *incr as i128; }
+			let incr = i.sub(Y as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(Y2) as usize + *i.sub(SYX) as usize + *i.sub(SZY) as usize + *i.sub(DYX) as usize + *i.add(DZY) as usize; *incr -= 1; count += *incr as i128; }
+			let incr = i.sub(Z as usize); if *incr > 127 { neighbours += 1; subcount += *i.sub(Z2) as usize + *i.sub(SZX) as usize + *i.sub(SZY) as usize + *i.sub(DZX) as usize + *i.sub(DZY) as usize; *incr -= 1; count += *incr as i128; }
+			let incr = i.add(X as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(X2) as usize + *i.add(SYX) as usize + *i.add(SZX) as usize + *i.sub(DYX) as usize + *i.sub(DZX) as usize; *incr -= 1; count += *incr as i128; }
+			let incr = i.add(Y as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(Y2) as usize + *i.add(SYX) as usize + *i.add(SZY) as usize + *i.add(DYX) as usize + *i.sub(DZY) as usize; *incr -= 1; count += *incr as i128; }
+			let incr = i.add(Z as usize); if *incr > 127 { neighbours += 1; subcount += *i.add(Z2) as usize + *i.add(SZX) as usize + *i.add(SZY) as usize + *i.add(DZX) as usize + *i.add(DZY) as usize; *incr -= 1; count += *incr as i128; }
+
+			// some of these values are sometimes negative
+			count += ((subcount >> 8) as i128) + ((neighbours * (neighbours + (length << 1) - 511)) >> 1);
+		}
+		while stack_top != ref_stack {
+			stack_top = stack_top.sub(1);
+			let i = *stack_top;
+			let incr = i.sub(X as usize); *incr |= *incr >> 4;
+			let incr = i.sub(Y as usize); *incr |= *incr >> 4;
+			let incr = i.sub(Z as usize); *incr |= *incr >> 4;
+			let incr = i.add(X as usize); *incr |= *incr >> 4;
+			let incr = i.add(Y as usize); *incr |= *incr >> 4;
+			let incr = i.add(Z as usize); *incr |= *incr >> 4;
+		}
+		return count as u128;
+	}
+}
