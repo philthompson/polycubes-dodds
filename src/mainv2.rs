@@ -9,27 +9,24 @@ this is a rust port of Stanley Dodds's algorithm, whose original
 
 rust port by Phil Thompson in January 2024, along with changes:
 - use multiple threads for computation of "nontrivial symmetries" portion
-- allow the work to be divided into many more thread tasks by changing FILTER_TASK relative to N
+- allow the work to be divided into many more thread tasks by changing FORK_DEPTH
 - allow use of previously-computed counts at "checkpoints" (to resume a long-running computation)
 - allow specifying more threads than worker tasks
 - print timestamps (elapsed time) for most messages
 
 -----
 
-looks like we can fork in different thread tasks at some FILTER_DEPTH to control
-  how many tasks we create
+we can fork at some FORK_DEPTH to control how many tasks we create:
 
-tasks for FILTER_DEPTH=5:
-N = 11 -> 23502
-N = 12 -> 162913
-N = 13 -> 1152870
+FORK_DEPTH=2 ->        15 thread tasks
+FORK_DEPTH=3 ->        86 thread tasks
+FORK_DEPTH=4 ->       534 thread tasks
+FORK_DEPTH=5 ->     3,481 thread tasks
+FORK_DEPTH=6 ->    23,502 thread tasks
+FORK_DEPTH=7 ->   162,913 thread tasks
+FORK_DEPTH=8 -> 1,152,870 thread tasks
+FORK_DEPTH=9 -> 8,294,738 thread tasks
 
-tasks for FILTER_DEPTH=7:
-N = 11 -> 534
-N = 12 -> 3481
-N = 13 -> 23502
-
-(see more in the readme)
 */
 
 use std::collections::hash_map::DefaultHasher;
@@ -44,15 +41,15 @@ use std::collections::BTreeSet;
 // this import needed depending on rust toolchain? or edition? (e.g. on Amazon Linux)
 //use std::convert::TryInto;
 
-const N: usize = 16; // number of polycube cells
-const FILTER_DEPTH: usize = 10; // keep smaller than N to use multiple threads (lower=more shorter thread tasks)
+const N: usize = 17; // number of polycube cells
+const FORK_DEPTH: usize = 5; // keep >1 (larger=more shorter thread tasks) but <9 to avoid too much memory use+initializiation time
 const THREADS: usize = 8;
 const USE_PRECOMPUTED_SYMM: bool = true; // use precomputed nontrivial symmetries, if available
 
 // output checkpoint count+finished tasks info no more often than this many seconds
 // depending on the running time of individual tasks, a multiple of this duration
 //   may elapse between checkpoints
-const CHECKPOINT_SECONDS: f32 = 15.0;
+const CHECKPOINT_SECONDS: f32 = 10.0;
 
 const PLACEHOLDER_REF_STACK_OFFSET: isize = -123456; // if this is changed, the task hashes will change and any previous checkpoints will no longer work
 
@@ -139,26 +136,26 @@ const NONTRIVIAL_SYMMETRIES_COUNTS: [u128; 23] = [0,
 	/* n=21 */ 1_055_564_170,
 	/* n=22 */ 3_699_765_374];
 
-// comment these out if wanting to re-calculate with the same N and FILTER_DEPTH
+// comment these out if wanting to re-calculate with the same N and FORK_DEPTH
 // these 4 fields can also be provided as cli args 1-4
 const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, u128); 13] = [
-	// N, FILTER_DEPTH, task hash, cumulative fixed polycubes count
-	(16, 10, 14250364139652756278, 1113840924125),
-	(16, 12, 9317956767031721395, 622727856628),
-	(16, 12, 15320539189854766585, 1039500728908),
-	(16, 12, 16863857699850425004, 1233957548477),
+	// N, FORK_DEPTH, task hash, cumulative fixed polycubes count
+	(16, 6, 14250364139652756278, 1113840924125),
+	(16, 4,  9317956767031721395,  622727856628),
+	(16, 4, 15320539189854766585, 1039500728908),
+	(16, 4, 16863857699850425004, 1233957548477),
 
-	(17, 12, 10306999600203458141, 6036447860508),
-	(17, 12, 14726552232942904259, 8794072714458),
+	(17, 5, 10306999600203458141, 6036447860508),
+	(17, 5, 14726552232942904259, 8794072714458),
 
-	(22, 13, 4882944094302709, 89552651750264),
-	(22, 13, 7624875869015158, 126084150825247),
+	(22, 9,  4882944094302709, 89552651750264),
+	(22, 9, 7624875869015158, 126084150825247),
 
-	(22, 14,   7391011772847126,   92455770341602),
-	(22, 14,  22599905593694915,  333264506359726),
-	(22, 14,  28707673513263559,  417454867221930),
-	(22, 14,  35618743721413906,  531334413791963),
-	(22, 14, 172126854280677014, 2861223911533484), // (0.92%)
+	(22, 8,   7391011772847126,   92455770341602),
+	(22, 8,  22599905593694915,  333264506359726),
+	(22, 8,  28707673513263559,  417454867221930),
+	(22, 8,  35618743721413906,  531334413791963),
+	(22, 8, 172126854280677014, 2861223911533484), // (0.92%)
 ];
 
 // for smaller values of N, we can greatly speed up computation by
@@ -255,7 +252,7 @@ fn main() {
 		println!("total count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(symmetry_time_elapsed));
 	} else {
 		let n_sleep = Duration::from_millis(N_SLEEP_MILLIS);
-		println!("THREADS={THREADS}, N={N}, n_sleep_millis={N_SLEEP_MILLIS}");
+		println!("N={N}, FORK_DEPTH={FORK_DEPTH}, THREADS={THREADS}, n_sleep_millis={N_SLEEP_MILLIS}");
 		// run a batch of worker tasks for each of the 4 symmetries
 		for sym in 0..4 {
 			print_w_time(overall_start_time, format!("Counting {} symmetries (set {} of 4):", DESCRIPTIONS[sym], sym+1));
@@ -342,7 +339,7 @@ fn main() {
 	{
 		print_w_time(overall_start_time, "Counting polycubes via extensions...".to_string());
 		let n_sleep = Duration::from_millis(N_SLEEP_MILLIS);
-		println!("THREADS={THREADS}, N={N}, n_sleep_millis={N_SLEEP_MILLIS}");
+		println!("N={N}, FORK_DEPTH={FORK_DEPTH}, THREADS={THREADS}, n_sleep_millis={N_SLEEP_MILLIS}");
 		let sw = Instant::now();
 		let mut subcount: u128 = 0;
 		let total_tasks: usize;
@@ -369,9 +366,9 @@ fn main() {
 			//checkpoints_to_consider.extend(FREE_PORTION_CHECKPOINTS.iter().cloned());
 		}
 
-		// find the highest available checkpoint for N+FILTER_DEPTH, if any
+		// find the highest available checkpoint for N+FORK_DEPTH, if any
 		for checkpoint in checkpoints_to_consider {
-			if checkpoint.0 != N || checkpoint.1 != FILTER_DEPTH {
+			if checkpoint.0 != N || checkpoint.1 != FORK_DEPTH {
 				continue;
 			}
 			completed_task_counts.insert(checkpoint.2, checkpoint.3);
@@ -404,7 +401,7 @@ fn main() {
 				i = i.sub(1);
 			}
 	
-			print_w_time(overall_start_time, format!("started  initializing tasks, N={N}, FILTER_DEPTH={FILTER_DEPTH}"));
+			print_w_time(overall_start_time, format!("started  initializing tasks, N={N}, FORK_DEPTH={FORK_DEPTH}"));
 	
 			// a vec of stacks, and offsets for stack_top_1
 			// for each entry in the vec, with a separate thread, run count_extensions_subset_final
@@ -424,7 +421,7 @@ fn main() {
 			ordered_task_hashes = tasks.keys().cloned().collect();
 
 			let time_elapsed = start_time.elapsed().as_secs_f64();
-			print_w_time(overall_start_time, format!("finished initializing {} tasks, N={N}, FILTER_DEPTH={FILTER_DEPTH}, took {}", tasks.len(), seconds_to_dur(time_elapsed)));
+			print_w_time(overall_start_time, format!("finished initializing {} tasks, N={N}, FORK_DEPTH={FORK_DEPTH}, took {}", tasks.len(), seconds_to_dur(time_elapsed)));
 
 			// remove completed tasks until we find the checkpoint
 			match last_checkpoint_task_hash {
@@ -526,7 +523,7 @@ fn main() {
 						last_checkpoint_total = new_checkpoint_total;
 						let new_checkpoint_nth_task: usize = ordered_task_hashes.binary_search(&last_checkpoint_task_hash.unwrap()).unwrap() + 1;
 						let new_checkpoint_pct = (new_checkpoint_nth_task as f32 * 100.0) / (total_tasks as f32);
-						print_w_time(overall_start_time, format!("N={N}, FILTER_DEPTH={FILTER_DEPTH} checkpoint at task [{}], {new_checkpoint_nth_task} of {total_tasks} ({:.2}%), cumulative fixed polycubes count={new_checkpoint_total}", last_checkpoint_task_hash.unwrap(), new_checkpoint_pct));
+						print_w_time(overall_start_time, format!("N={N}, FORK_DEPTH={FORK_DEPTH} checkpoint at task [{}], {new_checkpoint_nth_task} of {total_tasks} ({:.2}%), cumulative fixed polycubes count={new_checkpoint_total}", last_checkpoint_task_hash.unwrap(), new_checkpoint_pct));
 					}
 				}
 			}
@@ -727,7 +724,7 @@ fn count_extensions_subset_outer(task: ThreadTask, task_num: usize, overall_star
 		let stack_top_2 = ref_stack.offset(task.stack_top_2_offset);
 
 		if SHOW_ALL_TASK_RESULTS {
-			print_w_time(overall_start_time, format!("started  count_extensions_subset_outer() with task_number={}, N={N}, FILTER_DEPTH={FILTER_DEPTH}", task_num));
+			print_w_time(overall_start_time, format!("started  count_extensions_subset_outer() with task_number={}, N={N}, FORK_DEPTH={FORK_DEPTH}", task_num));
 		}
 
 		let count_and_tasks: (u128, BTreeMap<u64, ThreadTask>) =
@@ -735,7 +732,7 @@ fn count_extensions_subset_outer(task: ThreadTask, task_num: usize, overall_star
 
 		if SHOW_ALL_TASK_RESULTS {
 			let time_elapsed = start_time.elapsed().as_secs_f64();
-			print_w_time(overall_start_time, format!("finished count_extensions_subset_outer() with task_number={}, N={N}, FILTER_DEPTH={FILTER_DEPTH}, took {} with count={}", task_num, seconds_to_dur(time_elapsed), count_and_tasks.0));
+			print_w_time(overall_start_time, format!("finished count_extensions_subset_outer() with task_number={}, N={N}, FORK_DEPTH={FORK_DEPTH}, took {} with count={}", task_num, seconds_to_dur(time_elapsed), count_and_tasks.0));
 		}
 
 		//if !count_and_tasks.1.is_empty() {
@@ -825,12 +822,12 @@ fn count_extensions_subset_inner(
 			if depth == 4 {
 				count += count_extensions_subset_final(stack_top_inner, ref_stack);
 
-			} else if depth != FILTER_DEPTH {
+			} else if N - depth != FORK_DEPTH {
 				let mut deeper = count_extensions_subset_inner(depth - 1, stack_top_inner, stack_top_2, ref_stack, byte_board_arr, ref_stack_arr);
 				count += deeper.0;
 				tasks.append(&mut deeper.1);
 			
-			// at depth == FILTER_DEPTH, create a copy of the state to be later resumed by a thread
+			// at depth == FORK_DEPTH, create a copy of the state to be later resumed by a thread
 			} else {
 				let task = ThreadTask {
 					depth: depth - 1,
