@@ -41,15 +41,15 @@ use std::collections::BTreeSet;
 // this import needed depending on rust toolchain? or edition? (e.g. on Amazon Linux)
 //use std::convert::TryInto;
 
-const N: usize = 17; // number of polycube cells
-const FORK_DEPTH: usize = 5; // keep >1 (larger=more shorter thread tasks) but <9 to avoid too much memory use+initializiation time
+const N: usize = 18; // number of polycube cells
+const FORK_DEPTH: usize = 4; // keep >1 (larger=more shorter thread tasks) but <9 to avoid too much memory use+initializiation time
 const THREADS: usize = 8;
 const USE_PRECOMPUTED_SYMM: bool = true; // use precomputed nontrivial symmetries, if available
 
 // output checkpoint count+finished tasks info no more often than this many seconds
 // depending on the running time of individual tasks, a multiple of this duration
 //   may elapse between checkpoints
-const CHECKPOINT_SECONDS: f32 = 10.0;
+const CHECKPOINT_SECONDS: f32 = 300.0;
 
 const PLACEHOLDER_REF_STACK_OFFSET: isize = -123456; // if this is changed, the task hashes will change and any previous checkpoints will no longer work
 
@@ -77,6 +77,7 @@ const DZY: usize = (Z - Y) as usize;
 
 const BYTE_BOARD_LEN: usize = (N + 2) * (Z as usize);
 const REF_STACK_LEN: usize = (N - 2) * 4;
+const FORK_DEPTH_N: usize = N - FORK_DEPTH;
 
 const DESCRIPTIONS: [&str; 4] = [
 	"orthogonal order 2 rotation",
@@ -148,8 +149,8 @@ const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, u128); 13] = [
 	(17, 5, 10306999600203458141, 6036447860508),
 	(17, 5, 14726552232942904259, 8794072714458),
 
-	(22, 9,  4882944094302709, 89552651750264),
-	(22, 9, 7624875869015158, 126084150825247),
+	(22, 9,  4882944094302709,  89552651750264),
+	(22, 9,  7624875869015158, 126084150825247),
 
 	(22, 8,   7391011772847126,   92455770341602),
 	(22, 8,  22599905593694915,  333264506359726),
@@ -162,7 +163,7 @@ const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, u128); 13] = [
 //   lowering the sleep time used when waiting for threads to finish
 // for larger values of N, we can check less often and waste fewer
 //   cycles in the main thread
-const N_SLEEP_MILLIS: u64 = if N > 19 { N as u64 * 12 } else if N > 17 { N as u64 * 10 } else if N > 12 { N as u64 * 2 } else { N as u64 + 5 };
+const N_SLEEP_MILLIS: u64 = if N > 18 { N as u64 * 12 } else if N > 17 { N as u64 * 5 } else if N > 12 { N as u64 * 2 } else { N as u64 };
 
 pub struct ThreadTask {
 	pub depth: usize,
@@ -251,8 +252,9 @@ fn main() {
 		symmetry_time_elapsed = overall_start_time.elapsed().as_secs_f64();
 		println!("total count for nontrivial symmetries is {} for polycubes with {} cells\nTook {}", count, N, seconds_to_dur(symmetry_time_elapsed));
 	} else {
-		let n_sleep = Duration::from_millis(N_SLEEP_MILLIS);
-		println!("N={N}, FORK_DEPTH={FORK_DEPTH}, THREADS={THREADS}, n_sleep_millis={N_SLEEP_MILLIS}");
+		let sym_sleep = if N < 18 { N_SLEEP_MILLIS / 4 } else { N as u64 };
+		let n_sleep = Duration::from_millis(sym_sleep);
+		println!("N={N}, FORK_DEPTH={FORK_DEPTH}, THREADS={THREADS}, n_sleep_millis={}", sym_sleep);
 		// run a batch of worker tasks for each of the 4 symmetries
 		for sym in 0..4 {
 			print_w_time(overall_start_time, format!("Counting {} symmetries (set {} of 4):", DESCRIPTIONS[sym], sym+1));
@@ -363,7 +365,6 @@ fn main() {
 		// consider all hardcoded checkpoints
 		} else {
 			checkpoints_to_consider.extend(FREE_PORTION_CHECKPOINTS.iter());
-			//checkpoints_to_consider.extend(FREE_PORTION_CHECKPOINTS.iter().cloned());
 		}
 
 		// find the highest available checkpoint for N+FORK_DEPTH, if any
@@ -822,12 +823,12 @@ fn count_extensions_subset_inner(
 			if depth == 4 {
 				count += count_extensions_subset_final(stack_top_inner, ref_stack);
 
-			} else if N - depth != FORK_DEPTH {
+			} else if depth != FORK_DEPTH_N {
 				let mut deeper = count_extensions_subset_inner(depth - 1, stack_top_inner, stack_top_2, ref_stack, byte_board_arr, ref_stack_arr);
 				count += deeper.0;
 				tasks.append(&mut deeper.1);
 			
-			// at depth == FORK_DEPTH, create a copy of the state to be later resumed by a thread
+			// at depth == FORK_DEPTH_N, create a copy of the state to be later resumed by a thread
 			} else {
 				let task = ThreadTask {
 					depth: depth - 1,
