@@ -33,6 +33,7 @@ N = 13 -> 23502
 */
 
 use std::collections::hash_map::DefaultHasher;
+use std::env;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::time::Duration;
@@ -49,6 +50,8 @@ const THREADS: usize = 8;
 const USE_PRECOMPUTED_SYMM: bool = true; // use precomputed nontrivial symmetries, if available
 
 // output checkpoint count+finished tasks info no more often than this many seconds
+// depending on the running time of individual tasks, a multiple of this duration
+//   may elapse between checkpoints
 const CHECKPOINT_SECONDS: f32 = 15.0;
 
 const PLACEHOLDER_REF_STACK_OFFSET: isize = -123456; // if this is changed, the task hashes will change and any previous checkpoints will no longer work
@@ -137,6 +140,7 @@ const NONTRIVIAL_SYMMETRIES_COUNTS: [u128; 23] = [0,
 	/* n=22 */ 3_699_765_374];
 
 // comment these out if wanting to re-calculate with the same N and FILTER_DEPTH
+// these 4 fields can also be provided as cli args 1-4
 const FREE_PORTION_CHECKPOINTS: [(usize, usize, u64, u128); 13] = [
 	// N, FILTER_DEPTH, task hash, cumulative fixed polycubes count
 	(16, 10, 14250364139652756278, 1113840924125),
@@ -353,8 +357,20 @@ fn main() {
 		let mut last_checkpoint_total: u128 = 0;
 		let mut completed_tasks: usize = 0;
 
+		let mut checkpoints_to_consider: Vec<(usize, usize, u64, u128)> = Vec::new();
+		let args: Vec<String> = env::args().collect();
+		// consider only the cli arg checkpoint
+		if args.len() > 4 {
+			checkpoints_to_consider.push((args[1].parse().unwrap(), args[2].parse().unwrap(), args[3].parse().unwrap(), args[4].parse().unwrap()));
+
+		// consider all hardcoded checkpoints
+		} else {
+			checkpoints_to_consider.extend(FREE_PORTION_CHECKPOINTS.iter());
+			//checkpoints_to_consider.extend(FREE_PORTION_CHECKPOINTS.iter().cloned());
+		}
+
 		// find the highest available checkpoint for N+FILTER_DEPTH, if any
-		for checkpoint in FREE_PORTION_CHECKPOINTS {
+		for checkpoint in checkpoints_to_consider {
 			if checkpoint.0 != N || checkpoint.1 != FILTER_DEPTH {
 				continue;
 			}
