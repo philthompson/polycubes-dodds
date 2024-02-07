@@ -1,12 +1,18 @@
 # Polycubes
 
-This program computes the values for https://oeis.org/A000162 (except for trivially small values of N):
+This program computes the values for https://oeis.org/A000162 (except for trivially small values of *n*):
 
 The number of unique 3D polycubes that can be constructed with *n* cubes.
 
 This is a rust port of Stanley Dodds's algorithm, whose original C# code is available at: https://oeis.org/A000162/a000162.cs.txt
 
 The "v1" code was used to compute the `n=21` count used to extend that OEIS sequence.
+
+The "v2" code was used to compute the `n=22` count used to extend that OEIS sequence.
+
+The second portion of this program, which requires the vast majority of its running time,
+computes the number of "fixed" polycubes of size *n*.  The fixed counts for`n=21` and `n=22`
+were used to extend the OEIS sequence at https://oeis.org/draft/A001931.
 
 # Thread Tasks
 
@@ -50,6 +56,8 @@ n=16: 000d:00h:01m:18.004s
 n=17: 000d:00h:08m:28.415s
 n=18: 000d:01h:04m:18.560s 
 ```
+
+In AWS EC2, on a 64-thread machine, the "v2" code computed `n=22` over a period of 10 days.
 
 In AWS EC2, on a 16-thread machine, the "v1" code computed `n=21` over a period of 10 days.  For an analysis of running n=21 in AWS EC2, see my blog post here:
 https://philthompson.me/2024/Counting-Polycubes-of-Size-21.html
